@@ -1506,27 +1506,36 @@
       
       function parseImport() {
         const text = document.getElementById('import-area').value.trim();
-        if (!text) return;
+        if (!text) {
+          console.warn('CSV入力が空です');
+          return;
+        }
         const rows = text.split('\n');
         const parsed = [];
-        
-        rows.forEach(line => {
+
+        rows.forEach((line, idx) => {
             const parts = line.split(/[,\t]/);
-            if (parts.length < 4) return;
+            if (parts.length < 4) {
+              console.log(`行${idx + 1}は要素数が少ないためスキップ:`, parts);
+              return;
+            }
             const d = parts[0].trim();
             const amt = parseInt(parts[3].replace(/[^0-9]/g, ''));
             if (!isNaN(amt)) {
-              parsed.push({ 
-                  year: new Date(d).getFullYear(), 
-                  date: d, 
-                  category: parts[1].trim(), 
-                  title: parts[2].trim(), 
-                  amount: amt, 
-                  type: 'expense' 
+              parsed.push({
+                  year: new Date(d).getFullYear(),
+                  date: d,
+                  category: parts[1].trim(),
+                  title: parts[2].trim(),
+                  amount: amt,
+                  type: 'expense'
               });
+            } else {
+              console.log(`行${idx + 1}の金額がパースできません:`, parts[3]);
             }
         });
-        
+
+        console.log(`解析完了: ${parsed.length}件のデータ`);
         state.pendingImport = parsed;
         if (parsed.length) {
           document.getElementById('import-preview-box').classList.remove('hidden');
@@ -1540,6 +1549,8 @@
             </tr>
           `).join('');
           document.getElementById('import-preview-box').scrollIntoView({ behavior: 'smooth' });
+        } else {
+          alert('解析できるデータがありません。形式を確認してください。\n\n期待形式:\n日付,科目,内容,金額\n例: 2024-01-10,通信費,プロバイダ代,5500');
         }
       }
       
