@@ -945,11 +945,13 @@
         // 申告書類から「税金の計算」欄が一件も抽出できなかった場合（古いPDFで第一表下部が読み取れない等）、
         // 所得税の速算表（国税庁公表の超過累進税率）を使って課税される所得金額㉖から逆算する。
         // ※源泉徴収税額・申告納税額は書類に記載がなければ判定不能なため0のまま（推測しない）。
+        // 復興特別所得税は平成25年分（2013年分）の確定申告から導入された制度のため、
+        // それ以前の年分（state.currentYear < 2013）には存在しない。自動計算でも年分を見て判定する。
         let taxComputed = false;
         if (tax_gross === 0 && tax_net === 0 && tax_total === 0 && final_taxable_income > 0) {
           tax_gross = calcIncomeTax(final_taxable_income);
           tax_net = tax_gross;
-          tax_reconstruction = Math.floor(tax_net * 0.021);
+          tax_reconstruction = (state.currentYear >= 2013) ? Math.floor(tax_net * 0.021) : 0;
           tax_total = tax_net + tax_reconstruction;
           taxComputed = true;
         }
