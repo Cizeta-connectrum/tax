@@ -191,10 +191,14 @@ function reconcileBusinessExpense(docResult) {
   const sum = (pred) => items.filter(pred).reduce((s, i) => s + (Number(i.amount) || 0), 0);
 
   const businessRevenue = sum(i => i.type === 'revenue' && i.category === '売上・事業収入');
+  const businessIncomeExtracted = items.some(i => i.type === 'revenue' && i.category === '事業所得');
   const businessIncome = sum(i => i.type === 'revenue' && i.category === '事業所得');
   const existingExpense = sum(i => i.type === 'expense');
 
-  if (businessRevenue > 0 && businessIncome >= 0 && existingExpense === 0) {
+  // 「事業所得」が実際に文書から抽出された場合のみ、収入との差額を経費として逆算する。
+  // 事業所得が一件も抽出されていない場合（businessIncomeExtracted === false）は、
+  // 0円として扱うと収入全額がそのまま経費に複製されてしまうため、計算自体を行わない。
+  if (businessRevenue > 0 && businessIncomeExtracted && existingExpense === 0) {
     const computedExpense = businessRevenue - businessIncome;
     if (computedExpense > 0) {
       items.push({
