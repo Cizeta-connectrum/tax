@@ -18,6 +18,7 @@
       }
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
     <style>
       body { font-family: 'Inter', 'Noto Sans JP', sans-serif; }
@@ -68,6 +69,9 @@
       </button>
       <button onclick="switchTab('report')" id="tab-report" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale">
         <i class="fa-solid fa-file-invoice mr-1"></i>e-Tax転記レポート
+      </button>
+      <button onclick="switchTab('analysis')" id="tab-analysis" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale">
+        <i class="fa-solid fa-chart-line mr-1"></i>経年分析ダッシュボード
       </button>
     </div>
     
@@ -202,6 +206,62 @@
               <span class="font-black text-primary-700">課税される所得金額 ㉖ (⑨ - ㉕)</span>
             </div>
             <div class="col-span-4 tax-value p-3 flex items-center justify-end text-base text-primary-600 font-black" id="bB-taxable-income">
+              0
+            </div>
+          </div>
+
+          <div class="tax-section-title px-3 py-1 font-black text-slate-700 text-[10px] bg-amber-100">【 税金の計算 】</div>
+
+          <div class="grid grid-cols-12 tax-row">
+            <div class="col-span-8 tax-label p-2.5 border-r border-slate-300 flex items-center">
+              <span>上の㉖に対する税額（算出税額）㉗</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-700" id="bB-tax-gross">
+              0
+            </div>
+          </div>
+
+          <div class="grid grid-cols-12 tax-row">
+            <div class="col-span-8 tax-label p-2.5 border-r border-slate-300 flex items-center">
+              <span>差引所得税額</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-700" id="bB-tax-net">
+              0
+            </div>
+          </div>
+
+          <div class="grid grid-cols-12 tax-row">
+            <div class="col-span-8 tax-label p-2.5 border-r border-slate-300 flex items-center">
+              <span>復興特別所得税額</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-700" id="bB-tax-reconstruction">
+              0
+            </div>
+          </div>
+
+          <div class="grid grid-cols-12 tax-row bg-slate-100 font-black">
+            <div class="col-span-8 tax-label p-2.5 bg-slate-200 border-r border-slate-300 flex items-center">
+              <span>所得税及び復興特別所得税の額</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-900" id="bB-tax-total">
+              0
+            </div>
+          </div>
+
+          <div class="grid grid-cols-12 tax-row">
+            <div class="col-span-8 tax-label p-2.5 border-r border-slate-300 flex items-center">
+              <span>源泉徴収税額</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-700" id="bB-tax-withholding">
+              0
+            </div>
+          </div>
+
+          <div class="grid grid-cols-12 tax-row bg-amber-50">
+            <div class="col-span-8 tax-label p-3 bg-amber-100 border-r border-slate-300 flex items-center">
+              <span class="font-black text-amber-700">申告納税額</span>
+            </div>
+            <div class="col-span-4 tax-value p-3 flex items-center justify-end text-base text-amber-600 font-black" id="bB-tax-final">
               0
             </div>
           </div>
@@ -476,6 +536,52 @@
         <h2 id="rep-income" class="text-3xl font-black mt-1">¥0</h2>
       </div>
     </div>
+
+    <div id="view-analysis" class="hidden space-y-6">
+      <div id="analysis-empty" class="hidden bg-white p-12 rounded-2xl border border-slate-100 shadow-sm text-center text-slate-400">
+        <i class="fa-regular fa-folder-open text-2xl mb-2 block"></i>
+        <p class="text-xs font-bold">分析には2年度以上のデータが必要です</p>
+      </div>
+      <div id="analysis-content" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+            <h3 class="font-bold text-sm text-slate-700 mb-3"><i class="fa-solid fa-chart-line text-primary-600 mr-1"></i>総所得・課税所得・所得税額の推移</h3>
+            <canvas id="chart-income-trend" height="220"></canvas>
+          </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+            <h3 class="font-bold text-sm text-slate-700 mb-3"><i class="fa-solid fa-percent text-amber-600 mr-1"></i>実効税率の推移（所得税額÷総所得）</h3>
+            <canvas id="chart-tax-rate" height="220"></canvas>
+          </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+            <h3 class="font-bold text-sm text-slate-700 mb-3"><i class="fa-solid fa-layer-group text-indigo-600 mr-1"></i>給与所得 vs 事業所得の構成比</h3>
+            <canvas id="chart-income-mix" height="220"></canvas>
+          </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+            <h3 class="font-bold text-sm text-slate-700 mb-3"><i class="fa-solid fa-receipt text-rose-600 mr-1"></i>必要経費率の推移（必要経費÷事業収入）</h3>
+            <canvas id="chart-expense-ratio" height="220"></canvas>
+          </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+          <h3 class="font-bold text-sm text-slate-700 mb-4"><i class="fa-solid fa-table text-slate-500 mr-1"></i>前年比較表（増減額・増減率）</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+              <thead class="bg-slate-50 text-slate-500">
+                <tr>
+                  <th class="p-3 font-bold">年度</th>
+                  <th class="p-3 font-bold text-right">総所得</th>
+                  <th class="p-3 font-bold text-right">課税所得</th>
+                  <th class="p-3 font-bold text-right">所得税額</th>
+                  <th class="p-3 font-bold text-right">前年比（総所得）</th>
+                  <th class="p-3 font-bold text-right">前年比（所得税額）</th>
+                </tr>
+              </thead>
+              <tbody id="analysis-compare-tbody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
     </main>
     
     <div id="toast-overlay" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -499,9 +605,13 @@
         '修繕費', '消耗品費', '福利厚生費', '雑費', '専従者控除'
         ],
         deduction: [
-        '基礎控除', '配偶者控除', '配偶者特別控除', '扶養控除', 
-        '社会保険料控除', '小規模企業共済等掛金控除', '生命保険料控除', 
+        '基礎控除', '配偶者控除', '配偶者特別控除', '扶養控除',
+        '社会保険料控除', '小規模企業共済等掛金控除', '生命保険料控除',
         '地震保険料控除', '医療費控除', '寄附金控除(ふるさと納税)'
+        ],
+        tax: [
+        '課税される所得金額', '算出税額', '差引所得税額', '復興特別所得税額',
+        '所得税及び復興特別所得税の額', '源泉徴収税額', '申告納税額'
         ]
       };
       let state = { currentYear: new Date().getFullYear(), records: [], chart: null, pendingImport: [], pendingOcr: [], scanMode: 'receipt', taxView: 'sheetB' };
@@ -512,13 +622,14 @@
       };
       
       function switchTab(t) {
-        ['app', 'manual', 'camera', 'import', 'report'].forEach(x => {
+        ['app', 'manual', 'camera', 'import', 'report', 'analysis'].forEach(x => {
             document.getElementById('view-'+x).classList.add('hidden');
             document.getElementById('tab-'+x).className = "flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale";
         });
         document.getElementById('view-'+t).classList.remove('hidden');
         document.getElementById('tab-'+t).className = "flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs bg-primary-50 text-primary-600 shrink-0 touch-target active-scale";
         if (t === 'report') renderReport();
+        if (t === 'analysis') renderAnalysis();
       }
       
       function setScanMode(mode) {
@@ -611,7 +722,17 @@
             { id: 106, year: 2012, date: "2012-12-31", title: "旅費交通費(内訳書14)", amount: 39710, category: "旅費交通費", type: "expense", memo: "平成24年分収支内訳書" },
             { id: 107, year: 2012, date: "2012-12-31", title: "消耗品費(内訳書15)", amount: 7900, category: "消耗品費", type: "expense", memo: "平成24年分収支内訳書" },
             { id: 108, year: 2012, date: "2012-12-31", title: "社会保険料控除(⑫)", amount: 282337, category: "社会保険料控除", type: "deduction", memo: "平成24年分確定申告書B" },
-            { id: 109, year: 2012, date: "2012-12-31", title: "基礎控除(㉔)", amount: 380000, category: "基礎控除", type: "deduction", memo: "平成24年分確定申告書B" }
+            { id: 109, year: 2012, date: "2012-12-31", title: "基礎控除(㉔)", amount: 380000, category: "基礎控除", type: "deduction", memo: "平成24年分確定申告書B" },
+            { id: 110, year: 2012, date: "2012-12-31", title: "所得税及び復興特別所得税の額", amount: 16080, category: "所得税及び復興特別所得税の額", type: "tax", memo: "平成24年分確定申告書B" },
+            // --- 平成25年(2013年) 確定申告・決算書データ（経年分析デモ用） ---
+            { id: 201, year: 2013, date: "2013-12-31", title: "給与(額面収入額)", amount: 2850000, category: "給与収入", type: "salary", memo: "平成25年分源泉徴収票" },
+            { id: 202, year: 2013, date: "2013-12-31", title: "給与(控除後所得額)", amount: 1822000, category: "給与所得", type: "salary", memo: "平成25年分源泉徴収票" },
+            { id: 203, year: 2013, date: "2013-12-31", title: "事業売上収入(ア/①)", amount: 560000, category: "売上・事業収入", type: "revenue", memo: "平成25年分収支内訳書" },
+            { id: 204, year: 2013, date: "2013-12-31", title: "事業所得金額(①)", amount: 175000, category: "事業所得", type: "revenue", memo: "平成25年分収支内訳書" },
+            { id: 205, year: 2013, date: "2013-12-31", title: "必要経費合計(内訳書より)", amount: 385000, category: "雑費", type: "expense", memo: "平成25年分収支内訳書" },
+            { id: 206, year: 2013, date: "2013-12-31", title: "社会保険料控除(⑫)", amount: 295000, category: "社会保険料控除", type: "deduction", memo: "平成25年分確定申告書B" },
+            { id: 207, year: 2013, date: "2013-12-31", title: "基礎控除(㉔)", amount: 380000, category: "基礎控除", type: "deduction", memo: "平成25年分確定申告書B" },
+            { id: 208, year: 2013, date: "2013-12-31", title: "所得税及び復興特別所得税の額", amount: 21400, category: "所得税及び復興特別所得税の額", type: "tax", memo: "平成25年分確定申告書B" }
             ];
             localStorage.setItem('shinkoku_ledger', JSON.stringify(state.records));
             state.currentYear = 2012; 
@@ -722,13 +843,22 @@
         };
         
         let expense_total = 0;
-        
+        let tax_gross = 0, tax_net = 0, tax_reconstruction = 0, tax_total = 0, tax_withholding = 0, tax_final = 0;
+
         // スプレッドシートにある「科目名」の部分・完全一致で抽出し、すべて加算する（推測計算を一切しない）
-        yr.forEach(x => { 
+        yr.forEach(x => {
             const cleanCat = x.category.trim();
             const amt = Number(x.amount) || 0;
-            
-            if (cleanCat.includes('給与収入') || cleanCat.includes('給料支払') || (x.type === 'salary' && !cleanCat.includes('所得'))) {
+
+            if (x.type === 'tax') {
+              if (cleanCat === '算出税額') tax_gross += amt;
+              else if (cleanCat === '差引所得税額') tax_net += amt;
+              else if (cleanCat === '復興特別所得税額') tax_reconstruction += amt;
+              else if (cleanCat === '所得税及び復興特別所得税の額') tax_total += amt;
+              else if (cleanCat === '源泉徴収税額') tax_withholding += amt;
+              else if (cleanCat === '申告納税額') tax_final += amt;
+            }
+            else if (cleanCat.includes('給与収入') || cleanCat.includes('給料支払') || (x.type === 'salary' && !cleanCat.includes('所得'))) {
               target_salary_shunyu += amt;
             }
             else if (cleanCat.includes('給与所得')) {
@@ -795,7 +925,15 @@
         
         // 最終課税所得金額
         document.getElementById('bB-taxable-income').innerText = final_taxable_income.toLocaleString();
-        
+
+        // 税金の計算ブロック（抽出済みの実数値をそのまま表示。計算は一切行わない）
+        document.getElementById('bB-tax-gross').innerText = tax_gross.toLocaleString();
+        document.getElementById('bB-tax-net').innerText = tax_net.toLocaleString();
+        document.getElementById('bB-tax-reconstruction').innerText = tax_reconstruction.toLocaleString();
+        document.getElementById('bB-tax-total').innerText = tax_total.toLocaleString();
+        document.getElementById('bB-tax-withholding').innerText = tax_withholding.toLocaleString();
+        document.getElementById('bB-tax-final').innerText = tax_final.toLocaleString();
+
         // 収支内訳書側への適用
         const kessanContainer = document.getElementById('kessan-expense-tbody');
         kessanContainer.innerHTML = Object.entries(kessanExps).map(([k, v]) => `
@@ -821,6 +959,7 @@
             else if(x.type==='revenue') { badgeClass = "bg-emerald-50 text-emerald-600"; typeText = "売上"; }
             else if(x.type==='expense') { badgeClass = "bg-rose-50 text-rose-600"; typeText = "経費"; }
             else if(x.type==='deduction') { badgeClass = "bg-indigo-50 text-indigo-600"; typeText = "控除"; }
+            else if(x.type==='tax') { badgeClass = "bg-amber-50 text-amber-600"; typeText = "税金"; }
             
             return `
             <tr class="hover:bg-slate-50/50">
@@ -967,7 +1106,13 @@
                     { type: "expense", category: "旅費交通費", title: "旅費交通費(PDF)", amount: 39710 },
                     { type: "expense", category: "消耗品費", title: "消耗品費(PDF)", amount: 7900 },
                     { type: "deduction", category: "社会保険料控除", title: "社会保険(PDF)", amount: 282337 },
-                    { type: "deduction", category: "基礎控除", title: "基礎控除(PDF)", amount: 380000 }
+                    { type: "deduction", category: "基礎控除", title: "基礎控除(PDF)", amount: 380000 },
+                    { type: "tax", category: "算出税額", title: "算出税額(PDF)", amount: 15750 },
+                    { type: "tax", category: "差引所得税額", title: "差引所得税額(PDF)", amount: 15750 },
+                    { type: "tax", category: "復興特別所得税額", title: "復興特別所得税額(PDF)", amount: 330 },
+                    { type: "tax", category: "所得税及び復興特別所得税の額", title: "所得税及び復興特別所得税の額(PDF)", amount: 16080 },
+                    { type: "tax", category: "源泉徴収税額", title: "源泉徴収税額(PDF)", amount: 80300 },
+                    { type: "tax", category: "申告納税額", title: "申告納税額(PDF)", amount: -64200 }
                     ]
                   };
                   displayDocOcrResults(mockResults);
@@ -1040,11 +1185,12 @@
             else if (item.type === 'revenue') { badgeColor = "bg-emerald-50 text-emerald-600 border-emerald-200"; selectableCats = CATS.revenue; }
             else if (item.type === 'expense') { badgeColor = "bg-rose-50 text-rose-600 border-rose-200"; selectableCats = CATS.expense; }
             else if (item.type === 'deduction') { badgeColor = "bg-indigo-50 text-indigo-600 border-indigo-200"; selectableCats = CATS.deduction; }
-            
+            else if (item.type === 'tax') { badgeColor = "bg-amber-50 text-amber-600 border-amber-200"; selectableCats = CATS.tax; }
+
             return `
             <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 relative">
             <div class="flex justify-between items-center border-b pb-2">
-            <span class="text-xs font-black px-2 py-0.5 rounded border ${badgeColor}">${item.type === 'salary' ? '給与(収入/所得)' : item.type === 'revenue' ? '事業(売上/所得)' : item.type === 'expense' ? '必要経費' : '所得控除'}</span>
+            <span class="text-xs font-black px-2 py-0.5 rounded border ${badgeColor}">${item.type === 'salary' ? '給与(収入/所得)' : item.type === 'revenue' ? '事業(売上/所得)' : item.type === 'expense' ? '必要経費' : item.type === 'deduction' ? '所得控除' : '税金の計算'}</span>
             <input type="date" value="${item.date}" onchange="updateOcrItem(${idx}, 'date', this.value)" class="bg-transparent text-xs font-bold text-slate-500 outline-none max-w-[120px] text-right">
             </div>
             <div class="space-y-1">
@@ -1359,6 +1505,112 @@
         document.getElementById('rep-title').innerText = getWareki(state.currentYear) + '分 e-Tax連携転記レポート';
       }
       
+      function computeYearStats(yr) {
+        let salary_income = 0, business_income = 0, business_revenue = 0, expense_total = 0, tax_total = 0;
+        yr.forEach(x => {
+            const cleanCat = x.category.trim();
+            const amt = Number(x.amount) || 0;
+            if (cleanCat.includes('給与所得')) salary_income += amt;
+            else if (cleanCat.includes('事業所得')) business_income += amt;
+            else if (cleanCat.includes('売上') || cleanCat.includes('事業収入') || (x.type === 'revenue' && !cleanCat.includes('所得') && !cleanCat.includes('雑') && !cleanCat.includes('還付'))) business_revenue += amt;
+            else if (x.type === 'expense') expense_total += amt;
+            else if (x.type === 'tax' && cleanCat === '所得税及び復興特別所得税の額') tax_total += amt;
+        });
+        const total_income = salary_income + business_income;
+        const total_deductions = yr.filter(x => x.type === 'deduction').reduce((s, x) => s + (Number(x.amount) || 0), 0);
+        const taxable_income = Math.max(0, total_income - total_deductions);
+        return { salary_income, business_income, business_revenue, expense_total, tax_total, total_income, taxable_income };
+      }
+
+      let analysisCharts = {};
+
+      function renderAnalysis() {
+        const years = Array.from(new Set(state.records.map(r => r.year))).filter(y => !isNaN(y) && y > 1900).sort((a, b) => a - b);
+
+        if (years.length < 2) {
+          document.getElementById('analysis-empty').classList.remove('hidden');
+          document.getElementById('analysis-content').classList.add('hidden');
+          return;
+        }
+        document.getElementById('analysis-empty').classList.add('hidden');
+        document.getElementById('analysis-content').classList.remove('hidden');
+
+        const labels = years.map(y => getWareki(y));
+        const stats = years.map(y => computeYearStats(state.records.filter(r => r.year === y)));
+
+        const totalIncomeArr = stats.map(s => s.total_income);
+        const taxableIncomeArr = stats.map(s => s.taxable_income);
+        const taxTotalArr = stats.map(s => s.tax_total);
+        const taxRateArr = stats.map(s => s.total_income > 0 ? (s.tax_total / s.total_income * 100) : 0);
+        const salaryIncomeArr = stats.map(s => s.salary_income);
+        const businessIncomeArr = stats.map(s => s.business_income);
+        const expenseRatioArr = stats.map(s => s.business_revenue > 0 ? (s.expense_total / s.business_revenue * 100) : 0);
+
+        Object.values(analysisCharts).forEach(c => c && c.destroy());
+
+        analysisCharts.incomeTrend = new Chart(document.getElementById('chart-income-trend'), {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              { label: '総所得', data: totalIncomeArr, borderColor: '#4f46e5', backgroundColor: '#4f46e5', tension: 0.3 },
+              { label: '課税所得', data: taxableIncomeArr, borderColor: '#6366f1', backgroundColor: '#6366f1', tension: 0.3 },
+              { label: '所得税額', data: taxTotalArr, borderColor: '#f59e0b', backgroundColor: '#f59e0b', tension: 0.3 }
+            ]
+          },
+          options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
+        });
+
+        analysisCharts.taxRate = new Chart(document.getElementById('chart-tax-rate'), {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{ label: '実効税率(%)', data: taxRateArr.map(v => Number(v.toFixed(2))), borderColor: '#dc2626', backgroundColor: '#dc2626', tension: 0.3 }]
+          },
+          options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
+        });
+
+        analysisCharts.incomeMix = new Chart(document.getElementById('chart-income-mix'), {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [
+              { label: '給与所得', data: salaryIncomeArr, backgroundColor: '#3b82f6' },
+              { label: '事業所得', data: businessIncomeArr, backgroundColor: '#10b981' }
+            ]
+          },
+          options: { responsive: true, scales: { x: { stacked: true }, y: { stacked: true } }, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
+        });
+
+        analysisCharts.expenseRatio = new Chart(document.getElementById('chart-expense-ratio'), {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{ label: '必要経費率(%)', data: expenseRatioArr.map(v => Number(v.toFixed(2))), borderColor: '#e11d48', backgroundColor: '#e11d48', tension: 0.3 }]
+          },
+          options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
+        });
+
+        const tbody = document.getElementById('analysis-compare-tbody');
+        tbody.innerHTML = years.map((y, i) => {
+          const s = stats[i];
+          const prev = i > 0 ? stats[i - 1] : null;
+          const pct = (cur, base) => base > 0 ? (((cur - base) / base) * 100).toFixed(1) + '%' : '-';
+          const incomeChange = prev ? pct(s.total_income, prev.total_income) : '-';
+          const taxChange = prev ? pct(s.tax_total, prev.tax_total) : '-';
+          const colorClass = (v) => v === '-' ? 'text-slate-400' : (v.startsWith('-') ? 'text-emerald-600' : 'text-rose-600');
+          return `
+          <tr>
+            <td class="p-3 font-bold">${getWareki(y)}分</td>
+            <td class="p-3 text-right font-mono">¥${s.total_income.toLocaleString()}</td>
+            <td class="p-3 text-right font-mono">¥${s.taxable_income.toLocaleString()}</td>
+            <td class="p-3 text-right font-mono">¥${s.tax_total.toLocaleString()}</td>
+            <td class="p-3 text-right font-mono font-bold ${colorClass(incomeChange)}">${incomeChange}</td>
+            <td class="p-3 text-right font-mono font-bold ${colorClass(taxChange)}">${taxChange}</td>
+          </tr>`;
+        }).join('');
+      }
+
       function copyToClip(text) {
         const area = document.createElement('textarea'); 
         area.value = text; 

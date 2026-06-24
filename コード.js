@@ -124,6 +124,16 @@ Markdownの装飾は一切不要です。純粋なJSON文字列のみを出力�
   - 必要経費等 ➔ type: "expense", category: "雑費", title: "必要経費合計（第二表より）"
   この第二表の数値は、第一表の数字グリッドより読み取りやすい場合が多いため、両方を必ず確認し、実際に印字されている数値を採用してください。
 
+■ 確定申告書B（第一表）の「税金の計算」ブロックから（㉖以降）：
+- 「課税される所得金額 ㉖」 ➔ type: "tax", category: "課税される所得金額", title: "課税される所得金額"
+- 「上の㉖に対する税額 ㉗」 ➔ type: "tax", category: "算出税額", title: "算出税額"
+- 「差引所得税額」（控除後） ➔ type: "tax", category: "差引所得税額", title: "差引所得税額"
+- 「復興特別所得税額」 ➔ type: "tax", category: "復興特別所得税額", title: "復興特別所得税額"
+- 「所得税及び復興特別所得税の額」（合計） ➔ type: "tax", category: "所得税及び復興特別所得税の額", title: "所得税及び復興特別所得税の額"
+- 「源泉徴収税額」 ➔ type: "tax", category: "源泉徴収税額", title: "源泉徴収税額"
+- 「申告納税額」（納める税金・還付される税金） ➔ type: "tax", category: "申告納税額", title: "申告納税額"
+これらの「税金の計算」欄に記載がある項目だけ抽出し、記載のない項目は除外してください。
+
 【厳重注意】
 - 「収入金額（ア、カなど）」と「所得金額（①、⑥など）」を絶対に混同しないでください。
 - 減価償却費などの経費の数値を、誤って給与収入（カ）などに分類しないでください。
@@ -329,6 +339,7 @@ function getData() {
       if (rawType === "売上" || rawType === "revenue") type = "revenue";
       else if (rawType === "控除" || rawType === "deduction") type = "deduction";
       else if (rawType === "給与" || rawType === "salary") type = "salary";
+      else if (rawType === "税金" || rawType === "tax") type = "tax";
 
       return {
         id: index + 2,
@@ -353,6 +364,7 @@ function addData(item) {
   if (item.type === "revenue") typeJp = "売上";
   else if (item.type === "deduction") typeJp = "控除";
   else if (item.type === "salary") typeJp = "給与";
+  else if (item.type === "tax") typeJp = "税金";
 
   sheet.appendRow([
     item.date,
@@ -399,6 +411,7 @@ function updateData(rowIndex, item) {
   if (item.type === "revenue") typeJp = "売上";
   else if (item.type === "deduction") typeJp = "控除";
   else if (item.type === "salary") typeJp = "給与";
+  else if (item.type === "tax") typeJp = "税金";
   
   sheet.getRange(rowIndex, 1, 1, 6).setValues([[
     item.date,
