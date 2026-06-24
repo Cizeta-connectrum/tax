@@ -1018,20 +1018,27 @@
         const withholdingMap = {};
         let withholdingTotalIncome = 0, withholdingTotalTax = 0;
 
+        // titleから会社名を抽出（「給与（会社名）」→「会社名」）
+        const extractCompanyName = (title) => {
+          const match = title.match(/（(.+)）/);
+          return match ? match[1] : title;
+        };
+
         // income_detailから給与源泉関連を集計
         incomeDetailRows.forEach(x => {
           const cleanCat = x.category.trim();
           const amt = Number(x.amount) || 0;
 
           if (cleanCat === '給与' || cleanCat === '業務委託' || cleanCat.includes('源泉')) {
-            const key = x.title || cleanCat;
-            if (!withholdingMap[key]) withholdingMap[key] = { income: 0, withholding: 0 };
+            // 会社名を抽出してキーにする
+            const companyName = extractCompanyName(x.title || cleanCat);
+            if (!withholdingMap[companyName]) withholdingMap[companyName] = { income: 0, withholding: 0 };
 
             if (cleanCat.includes('源泉')) {
-              withholdingMap[key].withholding += amt;
+              withholdingMap[companyName].withholding += amt;
               withholdingTotalTax += amt;
             } else {
-              withholdingMap[key].income += amt;
+              withholdingMap[companyName].income += amt;
               withholdingTotalIncome += amt;
             }
           }
