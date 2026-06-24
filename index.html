@@ -126,7 +126,19 @@
               0
             </div>
           </div>
-          
+
+          <div class="grid grid-cols-12 tax-row">
+            <div class="col-span-4 tax-label p-2.5 flex items-center">
+              <span>雑収入</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end border-r border-slate-300 text-amber-700 bg-amber-50/10" id="bB-misc-raw">
+              0
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-amber-800 font-bold" id="bB-misc-income">
+              0
+            </div>
+          </div>
+
           <div class="grid grid-cols-12 tax-row bg-slate-100 font-black">
             <div class="col-span-4 tax-label p-2.5 bg-slate-200">
               <span>総合所得金額の合計 ⑨</span>
@@ -439,7 +451,22 @@
           </button>
         </div>
       </div>
-      
+
+      <div id="income-category-box" class="hidden bg-white p-6 rounded-2xl border border-slate-100 shadow-sm max-w-xl mx-auto">
+        <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2"><i class="fa-solid fa-tags text-primary-600"></i>この収入の区分を選択してください</h3>
+        <div class="grid grid-cols-3 gap-3">
+          <button onclick="setIncomeCategory('business')" id="btn-income-business" class="py-3 px-2 border-2 border-primary-500 bg-primary-50 text-primary-600 rounded-xl font-bold text-xs active-scale">
+            支払調書<br><span class="font-normal text-[10px]">事業(営業等)ア/①</span>
+          </button>
+          <button onclick="setIncomeCategory('salary')" id="btn-income-salary" class="py-3 px-2 border-2 border-transparent bg-slate-100 text-slate-600 rounded-xl font-bold text-xs active-scale">
+            源泉徴収票<br><span class="font-normal text-[10px]">給与カ/⑥</span>
+          </button>
+          <button onclick="setIncomeCategory('misc')" id="btn-income-misc" class="py-3 px-2 border-2 border-transparent bg-slate-100 text-slate-600 rounded-xl font-bold text-xs active-scale">
+            それ以外<br><span class="font-normal text-[10px]">雑収入</span>
+          </button>
+        </div>
+      </div>
+
       <div class="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm text-center max-w-xl mx-auto space-y-6">
         <div id="scanner-icon" class="w-24 h-24 bg-primary-50 rounded-full flex items-center justify-center mx-auto text-primary-600 shadow-inner">
           <i id="scan-icon-main" class="fa-solid fa-receipt text-4xl"></i>
@@ -649,7 +676,7 @@
         '所得税及び復興特別所得税の額', '源泉徴収税額', '申告納税額'
         ]
       };
-      let state = { currentYear: new Date().getFullYear(), records: [], chart: null, pendingImport: [], pendingOcr: [], scanMode: 'receipt', taxView: 'sheetB' };
+      let state = { currentYear: new Date().getFullYear(), records: [], chart: null, pendingImport: [], pendingOcr: [], scanMode: 'receipt', taxView: 'sheetB', incomeCategory: 'business' };
       
       window.onload = () => {
         updateDropdown();
@@ -678,11 +705,13 @@
           document.getElementById('view-manual').classList.remove('hidden');
           renderDashboard();
         } else if (t === 'withholding') {
-          document.getElementById('mode-selector-box').classList.remove('hidden');
+          document.getElementById('mode-selector-box').classList.add('hidden');
+          document.getElementById('income-category-box').classList.remove('hidden');
           setScanMode('document');
           document.getElementById('view-camera').classList.remove('hidden');
         } else if (t === 'expense') {
           document.getElementById('mode-selector-box').classList.add('hidden');
+          document.getElementById('income-category-box').classList.add('hidden');
           setScanMode('receipt');
           document.getElementById('view-camera').classList.remove('hidden');
           document.getElementById('view-import').classList.remove('hidden');
@@ -720,7 +749,22 @@
         }
         cancelOcr();
       }
-      
+
+      function setIncomeCategory(cat) {
+        state.incomeCategory = cat;
+        const map = {
+          business: 'btn-income-business',
+          salary: 'btn-income-salary',
+          misc: 'btn-income-misc'
+        };
+        Object.entries(map).forEach(([key, id]) => {
+          const btn = document.getElementById(id);
+          btn.className = key === cat
+            ? "py-3 px-2 border-2 border-primary-500 bg-primary-50 text-primary-600 rounded-xl font-bold text-xs active-scale"
+            : "py-3 px-2 border-2 border-transparent bg-slate-100 text-slate-600 rounded-xl font-bold text-xs active-scale";
+        });
+      }
+
       function setTaxSheetView(view) {
         state.taxView = view;
         const btnB = document.getElementById('btn-view-sheetB');
@@ -911,6 +955,7 @@
         let target_salary_shotoku = 0;
         let target_jigyo_shunyu = 0;
         let target_jigyo_shotoku = 0;
+        let target_misc_shunyu = 0;
         
         const kessanExps = {
           '雇人費': 0, '給料賃金': 0, '外注工賃': 0, '減価償却費': 0, '貸倒金': 0, 
@@ -947,6 +992,9 @@
             else if (cleanCat.includes('事業所得')) {
               target_jigyo_shotoku += amt;
             }
+            else if (cleanCat.includes('雑収入') || cleanCat.includes('還付金')) {
+              target_misc_shunyu += amt;
+            }
             else if (cleanCat.includes('社会保険料')) shaho_val += amt;
             else if (cleanCat.includes('小規模企業共済')) shokibo_val += amt;
             else if (cleanCat.includes('生命保険料')) life_val += amt;
@@ -965,7 +1013,7 @@
         });
         
         // 総合所得金額の合計 ⑨ （抽出された「給与所得」＋「事業所得」をそのまま合算）
-        const total_income = target_salary_shotoku + target_jigyo_shotoku; 
+        const total_income = target_salary_shotoku + target_jigyo_shotoku + target_misc_shunyu;
         
         // 所得控除合計 ㉕
         const total_deductions = shaho_val + shokibo_val + life_val + spouse_val + basic_val;
@@ -992,6 +1040,8 @@
         
         document.getElementById('bB-salary-raw').innerText = target_salary_shunyu > 0 ? target_salary_shunyu.toLocaleString() : '0';
         document.getElementById('bB-salary-income').innerText = target_salary_shotoku > 0 ? target_salary_shotoku.toLocaleString() : '0';
+        document.getElementById('bB-misc-raw').innerText = target_misc_shunyu > 0 ? target_misc_shunyu.toLocaleString() : '0';
+        document.getElementById('bB-misc-income').innerText = target_misc_shunyu > 0 ? target_misc_shunyu.toLocaleString() : '0';
         document.getElementById('bB-total-income').innerText = total_income.toLocaleString();
         
         // 所得控除
@@ -1245,7 +1295,7 @@
             if (state.scanMode === 'receipt') {
               google.script.run.withSuccessHandler(successHandler).withFailureHandler(errorHandler).analyzeImage(e.target.result, fileMime);
             } else {
-              google.script.run.withSuccessHandler(successHandler).withFailureHandler(errorHandler).analyzeTaxDocument(e.target.result, fileMime);
+              google.script.run.withSuccessHandler(successHandler).withFailureHandler(errorHandler).analyzeTaxDocument(e.target.result, fileMime, state.incomeCategory);
             }
           } else {
             setTimeout(() => {

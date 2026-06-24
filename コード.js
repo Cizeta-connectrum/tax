@@ -78,11 +78,18 @@ function analyzeImage(base64Data, mimeType) {
  * 徹底的に厳格化したPDF読み取り専用プロンプト
  * 数値の読み取り精度を最優先するため、レシート解析よりも高精度な gemini-2.5-pro を優先する
  */
-function analyzeTaxDocument(base64Data, mimeType) {
+function analyzeTaxDocument(base64Data, mimeType, incomeCategory) {
   const cleanApiKey = getApiKey();
   const actualMimeType = mimeType || "application/pdf";
   const availableModels = getAvailableModels(cleanApiKey);
   const priorityModels = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+
+  const incomeCategoryMap = {
+    business: { type: "revenue", category: "売上・事業収入", label: "事業（営業等）ア/①" },
+    salary: { type: "salary", category: "給与収入", label: "給与 カ/⑥" },
+    misc: { type: "revenue", category: "雑収入", label: "雑収入" }
+  };
+  const selectedIncome = incomeCategoryMap[incomeCategory];
 
   const prompt = `あなたはプロのデータ入力オペレーターです。添付された日本の確定申告書類（「確定申告書B（第一表・第二表）」「収支内訳書」のいずれか、または複数）を解析し、記載されている金額を一切の推測や計算を行わずに、そのまま抽出してJSON形式で返してください。
 Markdownの装飾は一切不要です。純粋なJSON文字列のみを出力してください。
@@ -155,11 +162,12 @@ Markdownの装飾は一切不要です。純粋なJSON文字列のみを出力�
 - 「配当所得」が記載されていれば ➔ type: "income_detail", category: "配当所得"
 - 「譲渡所得」が記載されていれば ➔ type: "income_detail", category: "譲渡所得"
 
-■ 支払調書（報酬、料金、契約金及び賞金の支払調書／業務委託・原稿料・講演料などの支払調書）が添付されている場合：
-- 「支払者」欄の氏名・名称 ➔ title に支払者名を含める（会社別の集計と紐付けるため、確定申告書B第二表の「給与（会社名）」と同じ命名規則で会社名を使用すること）
-- 「支払金額」 ➔ type: "income_detail", category: "業務委託", amount: 支払金額
-- 「源泉徴収税額」 ➔ type: "income_detail", category: "業務委託源泉", amount: 源泉徴収税額
-- この支払調書から読み取った支払金額・源泉徴収税額は、事業収入（売上・事業収入）や確定申告書の「源泉徴収税額」欄の値とは別に、必ず income_detail としてそのまま個別に抽出してください（事業収入への合算や金額の調整は行わないこと）。
+■ 支払調書（報酬、料金、契約金及び賞金の支払調書／業務委託・原稿料・講演料などの支払調書）または源泉徴収票が単独で添付されている場合（確定申告書B第一表・第二表が同時に添付されていない場合）：
+- 「支払者」または「給与の支払者」欄の氏名・名称 ➔ title に支払者名を含める（会社別の集計と紐付けるため、確定申告書B第二表の「給与（会社名）」と同じ命名規則で会社名を使用すること）
+- 「支払金額」または「給与等の金額」 ➔ type: "income_detail", category: "業務委託" | "給与", amount: 支払金額
+- 「源泉徴収税額」 ➔ type: "income_detail", category: "業務委託源泉" | "給与源泉", amount: 源泉徴収税額
+- この文書から読み取った支払金額・源泉徴収税額は、事業収入（売上・事業収入）や確定申告書の「源泉徴収税額」欄の値とは別に、必ず income_detail としてそのまま個別に抽出してください（他の項目への合算や金額の調整は行わないこと）。
+${selectedIncome ? `- さらに、ユーザーがこの文書の収入区分として「${selectedIncome.label}」を選択しています。上記の支払金額（源泉徴収税額を差し引く前の金額）と同額の項目を、type: "${selectedIncome.type}", category: "${selectedIncome.category}", title: "支払調書/源泉徴収票より" として追加で1件抽出し、items に含めてください。` : ''}
 
 【厳重注意】
 - 「収入金額（ア、カなど）」と「所得金額（①、⑥など）」を絶対に混同しないでください。
