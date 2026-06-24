@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+    <title>確定申告マネージャー</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: { 
+          extend: { 
+            colors: { 
+              brand: { 50: '#f0fdf4', 100: '#dcfce7', 200: '#bbf7d0', 500: '#22c55e', 600: '#16a34a', 700: '#15803d', 800: '#166534', 900: '#14532d' },
+              primary: { 50: '#f5f3ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' }
+            } 
+          } 
+        }
+      }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+      body { font-family: 'Inter', 'Noto Sans JP', sans-serif; }
+      .loading-spinner { border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5; border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      .touch-target { min-height: 48px; }
+      .active-scale:active { transform: scale(0.97); transition: transform 0.1s; }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      
+      .tax-sheet { background-color: #fcfbfa; border: 2px solid #2d3748; }
+      .tax-header { background-color: #e2e8f0; border-bottom: 2px solid #2d3748; }
+      .tax-label { background-color: #edf2f7; font-size: 11px; font-weight: bold; color: #4a5568; border-right: 1px solid #cbd5e0; }
+      .tax-value { font-family: 'Courier New', Courier, monospace; font-size: 14px; font-weight: bold; text-align: right; letter-spacing: 1px; }
+      .tax-row { border-bottom: 1px solid #cbd5e0; }
+      .tax-section-title { background-color: #cbd5e0; font-size: 11px; font-weight: 900; letter-spacing: 0.1em; }
+    </style>
+  </head>
+  <body class="bg-slate-100 text-slate-800 min-h-screen pb-24">
+    
+    <header class="bg-gradient-to-r from-primary-700 to-indigo-900 text-white shadow-md sticky top-0 z-40">
+      <div class="max-w-7xl mx-auto px-4 py-4 flex flex-row justify-between items-center gap-2">
+        <div class="flex items-center gap-3">
+          <div class="bg-white/10 p-2 rounded-xl border border-white/20">
+            <i class="fa-solid fa-calculator text-xl text-indigo-300"></i>
+          </div>
+          <h1 class="text-lg font-black tracking-tight">確定申告マネージャー</h1>
+        </div>
+        <div id="connection-status" class="bg-black/20 px-3 py-1.5 rounded-full border border-white/10 text-[10px] font-black tracking-wider text-emerald-300 uppercase">
+          接続確認中...
+        </div>
+      </div>
+    </header>
+    
+    <main class="max-w-7xl mx-auto px-3 sm:px-4 py-6">
+    
+    <div class="flex border-b border-slate-200 mb-6 bg-white p-1 rounded-2xl shadow-sm overflow-x-auto no-scrollbar gap-1">
+      <button onclick="switchTab('app')" id="tab-app" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs bg-primary-50 text-primary-600 shrink-0 touch-target active-scale">
+        <i class="fa-solid fa-file-invoice mr-1"></i>申告書・内訳書プレビュー
+      </button>
+      <button onclick="switchTab('manual')" id="tab-manual" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale">
+        <i class="fa-solid fa-square-plus mr-1"></i>手動データ登録
+      </button>
+      <button onclick="switchTab('camera')" id="tab-camera" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale">
+        <i class="fa-solid fa-camera mr-1"></i>AIスキャナー & e-Tax取込
+      </button>
+      <button onclick="switchTab('import')" id="tab-import" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale">
+        <i class="fa-solid fa-file-csv mr-1"></i>経費テキスト取り込み
+      </button>
+      <button onclick="switchTab('report')" id="tab-report" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale">
+        <i class="fa-solid fa-file-invoice mr-1"></i>e-Tax転記レポート
+      </button>
+    </div>
+    
+    <div id="view-app" class="space-y-6">
+      
+      <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between overflow-x-auto no-scrollbar gap-3">
+        <div class="flex items-center gap-2 shrink-0">
+          <span class="text-xs font-black text-slate-400"><i class="fa-solid fa-calendar-days mr-1"></i>表示年度:</span>
+        </div>
+        <div class="flex gap-2 overflow-x-auto no-scrollbar" id="year-selectors"></div>
+      </div>
+      
+      <div class="flex bg-slate-200/60 p-1 rounded-xl max-w-md mx-auto">
+        <button onclick="setTaxSheetView('sheetB')" id="btn-view-sheetB" class="flex-1 py-2 px-3 text-center rounded-lg font-black text-xs bg-white text-slate-800 shadow-sm transition-all">
+          確定申告書B (第一表レイアウト)
+        </button>
+        <button onclick="setTaxSheetView('kessan')" id="btn-view-kessan" class="flex-1 py-2 px-3 text-center rounded-lg font-bold text-xs text-slate-500 hover:text-slate-700 transition-all">
+          収支内訳書 (一般用経費レイアウト)
+        </button>
+      </div>
+      
+      <div id="tax-sheetB-container" class="max-w-3xl mx-auto bg-white rounded-3xl p-4 sm:p-6 shadow-xl border border-slate-200">
+        <div class="text-center mb-6">
+          <span id="sheetB-year-title" class="text-sm font-black text-slate-500 tracking-wider">平成XX年分</span>
+          <h2 class="text-xl sm:text-2xl font-black text-slate-800 tracking-tight mt-1">所得税及び復興特別所得税の確定申告書B（第一表風）</h2>
+          <p class="text-[10px] text-slate-400 mt-1">※自動計算を一切行わず、スプレッドシートの数値をそのまま表示しています。</p>
+        </div>
+        
+        <div class="tax-sheet rounded-2xl overflow-hidden shadow-sm border-2 border-slate-800 text-xs">
+          <div class="grid grid-cols-12 tax-header font-black text-center text-slate-700 border-b border-slate-800 py-1.5">
+            <div class="col-span-4 border-r border-slate-400">区分・項目</div>
+            <div class="col-span-4 border-r border-slate-400">収入金額等 (a)</div>
+            <div class="col-span-4">所得金額 (b)</div>
+          </div>
+          
+          <div class="tax-section-title px-3 py-1 font-black text-slate-700 text-[10px]">【 収入金額等 / 所得金額 】</div>
+          
+          <div class="grid grid-cols-12 tax-row">
+            <div class="col-span-4 tax-label p-2.5 flex items-center">
+              <span>事業 (営業等) ア/①</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end border-r border-slate-300 text-emerald-700 bg-emerald-50/20" id="bB-rev-raw">
+              0
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end font-black" id="bB-business-income">
+              0
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-12 tax-row">
+            <div class="col-span-4 tax-label p-2.5 flex items-center">
+              <span>給与 カ/⑥</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end border-r border-slate-300 text-blue-700 bg-blue-50/10" id="bB-salary-raw">
+              0
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-blue-800 font-bold" id="bB-salary-income">
+              0
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-12 tax-row bg-slate-100 font-black">
+            <div class="col-span-4 tax-label p-2.5 bg-slate-200">
+              <span>総合所得金額の合計 ⑨</span>
+            </div>
+            <div class="col-span-4 border-r border-slate-300 bg-slate-50"></div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-sm text-slate-900" id="bB-total-income">
+              0
+            </div>
+          </div>
+          
+          <div class="tax-section-title px-3 py-1 font-black text-slate-700 text-[10px]">【 所得から差し引かれる金額（所得控除） 】</div>
+          
+          <div class="grid grid-cols-12 tax-row">
+            <div class="col-span-8 tax-label p-2.5 border-r border-slate-300 flex justify-between items-center">
+              <span>社会保険料控除 ⑫</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-700" id="bB-ded-shaho">
+              0
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-12 tax-row">
+            <div class="col-span-8 tax-label p-2.5 border-r border-slate-300 flex justify-between items-center">
+              <span>小規模企業共済等掛金控除 ⑭</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-700" id="bB-ded-shokibo">
+              0
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-12 tax-row">
+            <div class="col-span-8 tax-label p-2.5 border-r border-slate-300 flex justify-between items-center">
+              <span>生命保険料控除 ⑰</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-700" id="bB-ded-life">
+              0
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-12 tax-row">
+            <div class="col-span-8 tax-label p-2.5 border-r border-slate-300 flex justify-between items-center">
+              <span>配偶者(特別)控除 ㉑</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-700" id="bB-ded-spouse">
+              0
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-12 tax-row">
+            <div class="col-span-8 tax-label p-2.5 border-r border-slate-300 flex justify-between items-center">
+              <span>基礎控除 ㉔</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-700" id="bB-ded-basic">
+              0
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-12 tax-row bg-slate-100 font-black">
+            <div class="col-span-8 tax-label p-2.5 bg-slate-200 border-r border-slate-300 flex justify-between items-center">
+              <span>所得控除の合計額 ㉕</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-900" id="bB-total-deductions">
+              0
+            </div>
+          </div>
+          
+          <div class="tax-section-title px-3 py-1 font-black text-slate-700 text-[10px] bg-indigo-100">【 課税される所得金額の計算 】</div>
+          
+          <div class="grid grid-cols-12 tax-row bg-primary-50/50">
+            <div class="col-span-8 tax-label p-3 bg-indigo-50 border-r border-slate-300 flex items-center">
+              <span class="font-black text-primary-700">課税される所得金額 ㉖ (⑨ - ㉕)</span>
+            </div>
+            <div class="col-span-4 tax-value p-3 flex items-center justify-end text-base text-primary-600 font-black" id="bB-taxable-income">
+              0
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div id="tax-kessan-container" class="max-w-3xl mx-auto bg-white rounded-3xl p-4 sm:p-6 shadow-xl border border-slate-200 hidden">
+        <div class="text-center mb-6">
+          <span id="kessan-year-title" class="text-sm font-black text-slate-500 tracking-wider">平成XX年分</span>
+          <h2 class="text-xl sm:text-2xl font-black text-slate-800 tracking-tight mt-1">収支内訳書（一般用経費プレビュー）</h2>
+          <p class="text-[10px] text-slate-400 mt-1">※事業所得控除・損益通算のもとになる必要経費の詳細明細です。</p>
+        </div>
+        
+        <div class="tax-sheet rounded-2xl overflow-hidden shadow-sm border-2 border-slate-800 text-xs">
+          <div class="grid grid-cols-12 tax-header font-black text-center text-slate-700 border-b border-slate-800 py-1.5">
+            <div class="col-span-6 border-r border-slate-400">経費の科目</div>
+            <div class="col-span-6">金額</div>
+          </div>
+          
+          <div id="kessan-expense-tbody" class="divide-y divide-slate-300">
+          </div>
+          
+          <div class="grid grid-cols-12 tax-row bg-rose-50 font-black text-sm">
+            <div class="col-span-6 tax-label p-3 bg-rose-100/50 border-r border-slate-300 flex items-center">
+              <span class="text-rose-700">必要経費合計（決算書合計）</span>
+            </div>
+            <div class="col-span-6 tax-value p-3 flex items-center justify-end text-rose-600 font-black" id="kessan-total-expense">
+              0
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+          <h3 id="list-title" class="font-bold flex items-center gap-2"><i class="fa-solid fa-list text-slate-400"></i>登録済み仕訳明細</h3>
+          <span id="data-count" class="bg-slate-100 text-slate-600 text-[10px] font-bold px-3 py-1 rounded-full">0件</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm text-left">
+            <thead class="bg-slate-50 text-slate-500">
+            <tr>
+              <th class="p-3 font-bold">日付</th>
+              <th class="p-3 font-bold">区分</th>
+              <th class="p-3 font-bold">勘定科目</th>
+              <th class="p-3 font-bold">内容 / 取引先</th>
+              <th class="p-3 font-bold text-right">金額</th>
+              <th class="p-3 font-bold text-center">操作</th>
+            </tr>
+            </thead>
+            <tbody id="data-tbody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+        <div class="mt-4 text-right">
+          <button onclick="deleteAllDataInYear()" class="text-xs text-rose-500 hover:bg-rose-50 border border-rose-200 px-4 py-2 rounded-xl font-bold transition-all"><i class="fa-solid fa-trash-can mr-1"></i>この年度のデータを全削除</button>
+        </div>
+      </div>
+    </div>
+    
+    <div id="view-manual" class="hidden max-w-xl mx-auto space-y-6">
+      <div class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-xl space-y-6">
+        <div>
+          <h3 class="text-lg font-black text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-square-pen text-primary-600"></i>
+            <span>新規取引データ登録</span>
+          </h3>
+          <p class="text-xs text-slate-400 mt-1">登録したい内容をカードから選択すると、項目に合わせた親切な入力フォームに切り替わります。</p>
+        </div>
+        
+        <form onsubmit="handleFormSubmit(event)" class="space-y-6">
+          <div class="space-y-2">
+            <label class="text-xs font-black text-slate-400 tracking-wider">登録する区分</label>
+            <div class="grid grid-cols-2 gap-2">
+              <div onclick="selectManualType('salary')" id="card-type-salary" class="border-2 border-primary-500 bg-primary-50/50 p-4 rounded-2xl cursor-pointer transition-all active-scale">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-xs font-black text-slate-800">① 給与</span>
+                  <i class="fa-solid fa-briefcase text-primary-500"></i>
+                </div>
+                <p class="text-[9px] text-slate-400 leading-normal">源泉徴収票の本業・副業などの給料支払金額</p>
+              </div>
+              <div onclick="selectManualType('revenue')" id="card-type-revenue" class="border-2 border-slate-200 p-4 rounded-2xl cursor-pointer hover:border-slate-300 transition-all active-scale">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-xs font-black text-slate-800">② 事業売上</span>
+                  <i class="fa-solid fa-coins text-emerald-500"></i>
+                </div>
+                <p class="text-[9px] text-slate-400 leading-normal">個人事業や副業で得た、差し引く前の収入金額</p>
+              </div>
+              <div onclick="selectManualType('expense')" id="card-type-expense" class="border-2 border-slate-200 p-4 rounded-2xl cursor-pointer hover:border-slate-300 transition-all active-scale">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-xs font-black text-slate-800">③ 必要経費</span>
+                  <i class="fa-solid fa-receipt text-rose-500"></i>
+                </div>
+                <p class="text-[9px] text-slate-400 leading-normal">給料賃金、地代家賃、減価償却費などの経費</p>
+              </div>
+              <div onclick="selectManualType('deduction')" id="card-type-deduction" class="border-2 border-slate-200 p-4 rounded-2xl cursor-pointer hover:border-slate-300 transition-all active-scale">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-xs font-black text-slate-800">④ 所得控除</span>
+                  <i class="fa-solid fa-user-shield text-indigo-500"></i>
+                </div>
+                <p class="text-[9px] text-slate-400 leading-normal">社会保険料、生命保険、基礎控除などの所得控除</p>
+              </div>
+            </div>
+            <input type="radio" name="type" value="salary" class="hidden" id="radio-type-salary" checked>
+            <input type="radio" name="type" value="revenue" class="hidden" id="radio-type-revenue">
+            <input type="radio" name="type" value="expense" class="hidden" id="radio-type-expense">
+            <input type="radio" name="type" value="deduction" class="hidden" id="radio-type-deduction">
+          </div>
+          
+          <div class="space-y-1.5">
+            <label class="text-xs font-black text-slate-400 tracking-wider">日付</label>
+            <input type="date" id="input-date" required class="w-full bg-slate-50 border border-slate-200 p-3 rounded-2xl text-sm outline-none focus:border-primary-500">
+          </div>
+          
+          <div class="space-y-1.5">
+            <label class="text-xs font-black text-slate-400 tracking-wider">科目</label>
+            <select id="input-category" required class="w-full bg-slate-50 border border-slate-200 p-3 rounded-2xl text-sm outline-none focus:border-primary-500"></select>
+          </div>
+          
+          <div class="space-y-1.5">
+            <label class="text-xs font-black text-slate-400 tracking-wider">内容 / 取引先・勤務先・店舗名称</label>
+            <input type="text" id="input-title" placeholder="例: A社給与、地代家賃案分、消耗品など" required class="w-full bg-slate-50 border border-slate-200 p-3 rounded-2xl text-sm outline-none focus:border-primary-500">
+          </div>
+          
+          <div class="space-y-1.5">
+            <label class="text-xs font-black text-slate-400 tracking-wider">金額 (¥)</label>
+            <input type="number" id="input-amount" placeholder="金額を数字で入力" required oninput="valPreview()" class="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl text-lg font-black text-right outline-none focus:border-primary-500 text-primary-600">
+            <div class="flex justify-between items-center text-xs font-bold mt-1 px-1">
+              <span class="text-slate-400 font-bold" id="preview-val-kanji"></span>
+              <span id="preview-val" class="text-primary-600 font-black"></span>
+            </div>
+          </div>
+          
+          <button type="submit" class="w-full bg-primary-600 hover:bg-primary-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-100 active-scale touch-target text-sm">
+            <i class="fa-solid fa-cloud-arrow-up mr-1"></i>
+            <span>データを保存する</span>
+          </button>
+        </form>
+      </div>
+    </div>
+    
+    <div id="view-camera" class="space-y-6 hidden">
+      <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm max-w-xl mx-auto">
+        <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2"><i class="fa-solid fa-expand text-primary-600"></i>インポート・スキャンモード選択</h3>
+        <div class="grid grid-cols-2 gap-3">
+          <button onclick="setScanMode('receipt')" id="btn-mode-receipt" class="py-3 px-4 border-2 border-primary-500 bg-primary-50 text-primary-600 rounded-xl font-bold text-xs active-scale">
+            <i class="fa-solid fa-receipt mr-1"></i>領収書・レシート
+          </button>
+          <button onclick="setScanMode('document')" id="btn-mode-document" class="py-3 px-4 border-2 border-transparent bg-slate-100 text-slate-600 rounded-xl font-bold text-xs active-scale">
+            <i class="fa-solid fa-file-pdf mr-1"></i>申告書類 (PDF/画像/.data)
+          </button>
+        </div>
+      </div>
+      
+      <div class="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm text-center max-w-xl mx-auto space-y-6">
+        <div id="scanner-icon" class="w-24 h-24 bg-primary-50 rounded-full flex items-center justify-center mx-auto text-primary-600 shadow-inner">
+          <i id="scan-icon-main" class="fa-solid fa-receipt text-4xl"></i>
+        </div>
+        <div>
+          <h2 id="scan-title" class="text-xl font-bold">AI領収書・レシート解析</h2>
+          <p id="scan-description" class="text-slate-500 text-xs mt-2 leading-relaxed">スマホのカメラでレシートを撮影するか、画像ファイルをアップロードしてください。<br>Geminiが日付・店舗・金額・推奨経費科目を自動抽出し、内訳書の経費として計上します。</p>
+        </div>
+        
+        <div class="flex flex-col gap-3">
+          <button onclick="document.getElementById('cameraInput').click()" class="w-full bg-primary-600 hover:bg-primary-700 text-white font-black py-4 rounded-xl shadow-lg shadow-primary-100 flex items-center justify-center gap-2 active-scale touch-target">
+            <i class="fa-solid fa-file-invoice text-lg"></i>
+            <span id="upload-btn-text">カメラを起動 / 画像を選択</span>
+          </button>
+          <input type="file" id="cameraInput" accept="image/*,application/pdf,.data" class="hidden" onchange="processFile(event)">
+        </div>
+      </div>
+      
+      <div id="ocr-results-box" class="hidden bg-white p-6 rounded-2xl border border-slate-100 shadow-sm max-w-xl mx-auto">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-lg font-bold flex items-center gap-2 text-indigo-600">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> AI解析結果プレビュー
+          </h3>
+          <span id="ocr-item-count" class="bg-indigo-50 text-indigo-600 text-[10px] font-black px-3 py-1 rounded-full">0件</span>
+        </div>
+        
+        <div id="ocr-items-container" class="space-y-4"></div>
+        
+        <div class="flex gap-3 pt-6 border-t mt-6">
+          <button onclick="cancelOcr()" class="flex-1 py-3.5 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 active-scale touch-target">破棄</button>
+          <button id="ocrSaveBtn" onclick="saveOcrResults()" class="flex-[2] py-3.5 bg-primary-600 text-white font-black rounded-xl shadow-lg active-scale flex items-center justify-center gap-2 touch-target">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+            <span>データをスプレッドシートに保存</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div id="view-import" class="hidden space-y-6">
+      <div class="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm text-center max-w-2xl mx-auto">
+        <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+          <i class="fa-solid fa-file-import text-2xl"></i>
+        </div>
+        <h2 class="text-lg font-bold">テキスト/CSV 経費一括取り込み</h2>
+        <p class="text-slate-500 text-xs mt-1 mb-6">Excel、スプレッドシート、または銀行・クレカ明細からコピーした行データを以下にペーストして一括で経費に追加できます。</p>
+        <textarea id="import-area" rows="8" placeholder="日付,科目,内容,金額&#13;&#10;2024-01-10,通信費,プロバイダ代,5500&#13;&#10;2024-01-15,消耗品費,ノート購入,350" class="w-full bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl p-4 font-mono text-xs mb-4 outline-none focus:border-brand-500"></textarea>
+        <div class="flex gap-4">
+          <button onclick="parseImport()" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-bold py-3.5 rounded-xl shadow-lg active-scale touch-target">解析・確認する</button>
+          <button onclick="document.getElementById('import-area').value=''" class="px-6 py-3.5 border border-slate-200 rounded-xl text-slate-400 hover:text-slate-600 font-bold active-scale touch-target">クリア</button>
+        </div>
+      </div>
+      
+      <div id="import-preview-box" class="hidden bg-white p-6 rounded-2xl border border-slate-100 shadow-sm max-w-2xl mx-auto">
+        <h3 class="font-bold mb-4">取り込みデータ確認 (全 <span id="imp-count" class="text-brand-600">0</span> 件)</h3>
+        <div class="max-h-60 overflow-y-auto mb-4 border rounded-xl no-scrollbar">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-slate-50 sticky top-0 border-b">
+            <tr>
+              <th class="p-3">日付</th>
+              <th class="p-3">必要経費科目</th>
+              <th class="p-3">店名・内容</th>
+              <th class="p-3 text-right">金額</th>
+            </tr>
+            </thead>
+            <tbody id="imp-tbody" class="divide-y"></tbody>
+          </table>
+        </div>
+        <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-xs font-bold text-indigo-800 mb-3 text-center">
+          <i class="fa-solid fa-circle-info mr-1"></i> 取り込まれたデータから高精度にテキスト解析されました。
+        </div>
+        <button onclick="execImport()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 rounded-xl text-md active-scale shadow-lg touch-target">スプレッドシートに一括保存</button>
+      </div>
+    </div>
+    
+    <div id="view-report" class="hidden bg-white p-8 rounded-2xl border border-slate-100 shadow-sm max-w-3xl mx-auto">
+      <div class="flex items-center justify-between border-b pb-4 mb-6">
+        <h2 id="rep-title" class="text-lg font-black text-slate-800">202X年分 e-Tax連携・所得申告用 data</h2>
+        <div class="bg-primary-50 text-primary-600 text-[10px] font-bold px-3 py-1 rounded-full"><i class="fa-solid fa-circle-check mr-1"></i>給与＋損益通算モデル準拠</div>
+      </div>
+      <p class="text-slate-500 text-xs mb-6 leading-relaxed">e-Taxに入力する各フェーズに対応した集計結果です。対応する数値を「コピー」してそのまま各ポータルへ入力してください。</p>
+      
+      <div class="space-y-6">
+        <div class="border rounded-2xl p-4 bg-slate-50/50">
+          <h3 class="font-bold text-blue-800 flex items-center justify-between text-sm mb-3">
+            <span><i class="fa-solid fa-briefcase mr-1.5"></i>1. 給与所得の入力（申告書コーナー）</span>
+            <span id="rep-sal-total" class="font-black text-sm text-slate-700">給与収入合計: ¥0</span>
+          </h3>
+          <div id="rep-salary-block" class="space-y-2 text-xs"></div>
+        </div>
+        
+        <div class="border rounded-2xl p-4">
+          <h3 class="font-bold text-rose-800 flex items-center justify-between text-sm mb-3">
+            <span><i class="fa-solid fa-file-invoice-dollar mr-1.5"></i>2. 収支内訳書の入力（一般用・経費項目）</span>
+            <span id="rep-exp-total" class="font-black text-sm text-slate-700">経費合計: ¥0</span>
+          </h3>
+          <div id="rep-business-block" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <span class="font-bold text-slate-500 text-[10px] block mb-2 uppercase">事業売上</span>
+              <div id="rep-rev" class="divide-y text-xs"></div>
+            </div>
+            <div>
+              <span class="font-bold text-slate-500 text-[10px] block mb-2 uppercase">必要経費（内訳書項目）</span>
+              <div id="rep-exp" class="divide-y text-xs"></div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="border rounded-2xl p-4 bg-slate-50/50">
+          <h3 class="font-bold text-slate-700 flex items-center justify-between text-sm mb-3">
+            <span><i class="fa-solid fa-user-shield mr-1.5"></i>3. 所得控除の入力（生命保険、社保、基礎控除等）</span>
+            <span id="rep-ded-total" class="font-black text-sm text-slate-700">控除合計: ¥0</span>
+          </h3>
+          <div id="rep-ded" class="divide-y text-xs"></div>
+        </div>
+      </div>
+      
+      <div class="mt-8 p-6 bg-indigo-600 text-white rounded-2xl text-center shadow-lg">
+        <p class="text-xs opacity-75">全通算後の課税対象所得金額 (所得税額算出のベース)</p>
+        <h2 id="rep-income" class="text-3xl font-black mt-1">¥0</h2>
+      </div>
+    </div>
+    </main>
+    
+    <div id="toast-overlay" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl flex flex-col items-center space-y-4">
+        <div id="toast-spinner" class="loading-spinner"></div>
+        <div id="toast-icon-success" class="hidden bg-emerald-50 text-emerald-500 p-4 rounded-full"><i class="fa-solid fa-circle-check text-4xl"></i></div>
+        <div id="toast-icon-error" class="hidden bg-rose-50 text-rose-500 p-4 rounded-full"><i class="fa-solid fa-triangle-exclamation text-4xl"></i></div>
+        <p id="toast-text" class="text-xs font-bold text-slate-600 leading-relaxed"></p>
+        <button id="toast-close" onclick="closeToast()" class="hidden w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold rounded-xl active-scale touch-target text-xs">閉じる</button>
+      </div>
+    </div>
+    
+    <script>
+      const CATS = {
+        salary: ['給与収入', '給与所得'],
+        revenue: ['売上・事業収入', '事業所得', '雑収入', '還付金'],
+        expense: [
+        '雇人費', '給料賃金', '外注工賃', '減価償却費', '貸倒金', 
+        '地代家賃', '利子割引料', '租税公課', '荷造運賃', '水道光熱費', 
+        '旅費交通費', '通信費', '広告宣伝費', '接待交際費', '損害保険料', 
+        '修繕費', '消耗品費', '福利厚生費', '雑費', '専従者控除'
+        ],
+        deduction: [
+        '基礎控除', '配偶者控除', '配偶者特別控除', '扶養控除', 
+        '社会保険料控除', '小規模企業共済等掛金控除', '生命保険料控除', 
+        '地震保険料控除', '医療費控除', '寄附金控除(ふるさと納税)'
+        ]
+      };
+      let state = { currentYear: new Date().getFullYear(), records: [], chart: null, pendingImport: [], pendingOcr: [], scanMode: 'receipt', taxView: 'sheetB' };
+      
+      window.onload = () => {
+        updateDropdown();
+        checkEnv();
+      };
+      
+      function switchTab(t) {
+        ['app', 'manual', 'camera', 'import', 'report'].forEach(x => {
+            document.getElementById('view-'+x).classList.add('hidden');
+            document.getElementById('tab-'+x).className = "flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale";
+        });
+        document.getElementById('view-'+t).classList.remove('hidden');
+        document.getElementById('tab-'+t).className = "flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs bg-primary-50 text-primary-600 shrink-0 touch-target active-scale";
+        if (t === 'report') renderReport();
+      }
+      
+      function setScanMode(mode) {
+        const btnReceipt = document.getElementById('btn-mode-receipt');
+        const btnDoc = document.getElementById('btn-mode-document');
+        const iconMain = document.getElementById('scan-icon-main');
+        const title = document.getElementById('scan-title');
+        const desc = document.getElementById('scan-description');
+        const btnText = document.getElementById('upload-btn-text');
+        state.scanMode = mode;
+        
+        if (mode === 'receipt') {
+          btnReceipt.className = "py-3 px-4 border-2 border-primary-500 bg-primary-50 text-primary-600 rounded-xl font-bold text-xs active-scale";
+          btnDoc.className = "py-3 px-4 border-2 border-transparent bg-slate-100 text-slate-600 rounded-xl font-bold text-xs active-scale";
+          iconMain.className = "fa-solid fa-receipt text-4xl";
+          title.innerText = "AI領収書・レシート解析";
+          desc.innerText = "スマホのカメラでレシートを撮影するか、画像ファイルをアップロードしてください。日付・店舗・金額・推奨経費科目を自動抽出し、内訳書の経費として計上します。";
+          btnText.innerText = "カメラを起動 / 画像を選択";
+        } else {
+          btnReceipt.className = "py-3 px-4 border-2 border-transparent bg-slate-100 text-slate-600 rounded-xl font-bold text-xs active-scale";
+          btnDoc.className = "py-3 px-4 border-2 border-primary-500 bg-primary-50 text-primary-600 rounded-xl font-bold text-xs active-scale";
+          iconMain.className = "fa-solid fa-file-pdf text-4xl text-rose-500";
+          title.innerText = "申告書・内訳書 PDF/画像/e-Taxデータ 解析";
+          desc.innerText = "確定申告書Bや収支内訳書のPDF・スキャン画像、またはe-Tax保存ファイル（.data形式等）を直接アップロードしてください。Geminiが一括で「給与、売上、各種経費、各種所得控除」を丸ごと見取ってデータ化します。";
+          btnText.innerText = "申告データ(PDF/画像/.data)を選択";
+        }
+        cancelOcr();
+      }
+      
+      function setTaxSheetView(view) {
+        state.taxView = view;
+        const btnB = document.getElementById('btn-view-sheetB');
+        const btnK = document.getElementById('btn-view-kessan');
+        const boxB = document.getElementById('tax-sheetB-container');
+        const boxK = document.getElementById('tax-kessan-container');
+        
+        if (view === 'sheetB') {
+          btnB.className = "flex-1 py-2 px-3 text-center rounded-lg font-black text-xs bg-white text-slate-800 shadow-sm transition-all";
+          btnK.className = "flex-1 py-2 px-3 text-center rounded-lg font-bold text-xs text-slate-500 hover:text-slate-700 transition-all";
+          boxB.classList.remove('hidden');
+          boxK.classList.add('hidden');
+        } else {
+          btnB.className = "flex-1 py-2 px-3 text-center rounded-lg font-bold text-xs text-slate-500 hover:text-slate-700 transition-all";
+          btnK.className = "flex-1 py-2 px-3 text-center rounded-lg font-black text-xs bg-white text-slate-800 shadow-sm transition-all";
+          boxB.classList.add('hidden');
+          boxK.classList.remove('hidden');
+        }
+      }
+      
+      function selectManualType(type) {
+        ['salary', 'revenue', 'expense', 'deduction'].forEach(t => {
+            const card = document.getElementById('card-type-' + t);
+            card.className = "border-2 border-slate-200 p-4 rounded-2xl cursor-pointer hover:border-slate-300 transition-all active-scale";
+            document.getElementById('radio-type-' + t).checked = false;
+        });
+        const activeCard = document.getElementById('card-type-' + type);
+        let borderClass = "border-primary-500 bg-primary-50/50";
+        if (type === 'revenue') borderClass = "border-emerald-500 bg-emerald-50/30";
+        if (type === 'expense') borderClass = "border-rose-500 bg-rose-50/30";
+        if (type === 'deduction') borderClass = "border-indigo-500 bg-indigo-50/30";
+        
+        activeCard.className = `border-2 ${borderClass} p-4 rounded-2xl cursor-pointer transition-all active-scale`;
+        document.getElementById('radio-type-' + type).checked = true;
+        updateDropdown();
+      }
+      
+      function checkEnv() {
+        if (typeof google !== 'undefined' && google.script) {
+          document.getElementById('connection-status').innerText = "スプレッドシート接続";
+          document.getElementById('connection-status').className = "bg-emerald-950 border border-emerald-500/30 px-3 py-1.5 rounded-full text-[10px] font-black tracking-wider text-emerald-400 uppercase";
+          google.script.run.withSuccessHandler(res => { 
+              state.records = res; 
+              autoSwitchToLatestYear();
+              renderDashboard(); 
+              renderYears(); 
+          }).getData();
+        } else {
+          document.getElementById('connection-status').innerText = "デモモード(LocalStorage)";
+          document.getElementById('connection-status').className = "bg-rose-950 border border-rose-500/30 px-3 py-1.5 rounded-full text-[10px] font-black tracking-wider text-rose-400 uppercase";
+          state.records = JSON.parse(localStorage.getItem('shinkoku_ledger') || '[]');
+          if (state.records.length === 0) {
+            state.records = [
+            // --- 平成24年(2012年) 確定申告・決算書データ ---
+            { id: 101, year: 2012, date: "2012-12-31", title: "給与(額面収入額)", amount: 2706097, category: "給与収入", type: "salary", memo: "平成24年分源泉徴収票" },
+            { id: 102, year: 2012, date: "2012-12-31", title: "給与(控除後所得額)", amount: 1712800, category: "給与所得", type: "salary", memo: "平成24年分源泉徴収票" },
+            { id: 103, year: 2012, date: "2012-12-31", title: "事業売上収入(ア/①)", amount: 499999, category: "売上・事業収入", type: "revenue", memo: "平成24年分収支内訳書" },
+            { id: 1035, year: 2012, date: "2012-12-31", title: "事業所得金額(①)", amount: 146042, category: "事業所得", type: "revenue", memo: "平成24年分収支内訳書" },
+            { id: 104, year: 2012, date: "2012-12-31", title: "給料賃金(内訳書10)", amount: 163500, category: "給料賃金", type: "expense", memo: "平成24年分収支内訳書" },
+            { id: 105, year: 2012, date: "2012-12-31", title: "減価償却費(内訳書16)", amount: 146802, category: "減価償却費", type: "expense", memo: "平成24年分収支内訳書" },
+            { id: 106, year: 2012, date: "2012-12-31", title: "旅費交通費(内訳書14)", amount: 39710, category: "旅費交通費", type: "expense", memo: "平成24年分収支内訳書" },
+            { id: 107, year: 2012, date: "2012-12-31", title: "消耗品費(内訳書15)", amount: 7900, category: "消耗品費", type: "expense", memo: "平成24年分収支内訳書" },
+            { id: 108, year: 2012, date: "2012-12-31", title: "社会保険料控除(⑫)", amount: 282337, category: "社会保険料控除", type: "deduction", memo: "平成24年分確定申告書B" },
+            { id: 109, year: 2012, date: "2012-12-31", title: "基礎控除(㉔)", amount: 380000, category: "基礎控除", type: "deduction", memo: "平成24年分確定申告書B" }
+            ];
+            localStorage.setItem('shinkoku_ledger', JSON.stringify(state.records));
+            state.currentYear = 2012; 
+          }
+          autoSwitchToLatestYear();
+          renderDashboard(); 
+          renderYears();
+        }
+      }
+      
+      function autoSwitchToLatestYear() {
+        if (state.records && state.records.length > 0) {
+          const years = state.records.map(r => r.year).filter(y => !isNaN(y) && y > 1900);
+          if (years.length > 0) {
+            state.currentYear = Math.max(...years);
+          }
+        }
+      }
+      
+      function getWareki(year) {
+        if (isNaN(year) || year < 1868) return year + "年";
+        if (year >= 2019) {
+          const r = year - 2018;
+          return "令和" + (r === 1 ? "元" : r) + "年";
+        } else if (year >= 1989) {
+          const h = year - 1988;
+          return "平成" + (h === 1 ? "元" : h) + "年";
+        } else if (year >= 1926) {
+          const s = year - 1925;
+          return "昭和" + (s === 1 ? "元" : s) + "年";
+        } else if (year >= 1912) {
+          const t = year - 1911;
+          return "大正" + (t === 1 ? "元" : t) + "年";
+        } else {
+          const m = year - 1867;
+          return "明治" + (m === 1 ? "元" : m) + "年";
+        }
+      }
+      
+      function renderYears() {
+        const yset = new Set(state.records.map(r => r.year));
+        yset.add(new Date().getFullYear());
+        const sorted = Array.from(yset).filter(y => !isNaN(y) && y > 1900).sort((a,b)=>a-b);
+        const container = document.getElementById('year-selectors');
+        container.innerHTML = '';
+        sorted.forEach(y => {
+            const btn = document.createElement('button');
+            btn.className = (y === state.currentYear) 
+            ? "px-5 py-2 bg-primary-600 text-white rounded-xl text-xs font-black shrink-0 shadow-md active-scale touch-target" 
+            : "px-5 py-2 bg-slate-100 rounded-xl text-slate-500 text-xs font-bold shrink-0 hover:bg-slate-200 active-scale touch-target";
+            btn.innerText = getWareki(y) + "分";
+            btn.onclick = () => { state.currentYear = y; renderDashboard(); renderYears(); };
+            container.appendChild(btn);
+        });
+      }
+      
+      function updateDropdown() {
+        const type = document.querySelector('input[name="type"]:checked').value;
+        const sel = document.getElementById('input-category');
+        sel.innerHTML = CATS[type].map(c => `<option value="${c}">${c}</option>`).join('');
+      }
+      
+      function valPreview() {
+        const valInput = document.getElementById('input-amount').value;
+        const v = parseInt(valInput);
+        const previewVal = document.getElementById('preview-val');
+        const previewValKanji = document.getElementById('preview-val-kanji');
+        
+        if (isNaN(v) || valInput === "") {
+          previewVal.innerText = '';
+          previewValKanji.innerText = '';
+          return;
+        }
+        
+        previewVal.innerText = '¥ ' + v.toLocaleString();
+        
+        let kanji = "";
+        if (v >= 100000000) {
+          kanji = (v / 100000000).toFixed(2) + " 億円";
+        } else if (v >= 10000) {
+          kanji = (v / 10000).toFixed(1) + " 万";
+          const remaining = v % 10000;
+          if (remaining > 0) {
+            kanji += " " + remaining.toLocaleString() + " 円";
+          } else {
+            kanji += " 円";
+          }
+        } else {
+          kanji = v.toLocaleString() + " 円";
+        }
+        previewValKanji.innerText = `（およそ ${kanji}）`;
+      }
+      
+      function renderDashboard() {
+        const yr = state.records.filter(r => r.year === state.currentYear);
+        
+        let shaho_val = 0, shokibo_val = 0, life_val = 0, spouse_val = 0, basic_val = 0;
+        let target_salary_shunyu = 0;
+        let target_salary_shotoku = 0;
+        let target_jigyo_shunyu = 0;
+        let target_jigyo_shotoku = 0;
+        
+        const kessanExps = {
+          '雇人費': 0, '給料賃金': 0, '外注工賃': 0, '減価償却費': 0, '貸倒金': 0, 
+          '地代家賃': 0, '利子割引料': 0, '租税公課': 0, '荷造運賃': 0, '水道光熱費': 0, 
+          '旅費交通費': 0, '通信費': 0, '広告宣伝費': 0, '接待交際費': 0, '損害保険料': 0, 
+          '修繕費': 0, '消耗品費': 0, '福利厚生費': 0, '雑費': 0, '専従者控除': 0
+        };
+        
+        let expense_total = 0;
+        
+        // スプレッドシートにある「科目名」の部分・完全一致で抽出し、すべて加算する（推測計算を一切しない）
+        yr.forEach(x => { 
+            const cleanCat = x.category.trim();
+            const amt = Number(x.amount) || 0;
+            
+            if (cleanCat.includes('給与収入') || cleanCat.includes('給料支払') || (x.type === 'salary' && !cleanCat.includes('所得'))) {
+              target_salary_shunyu += amt;
+            }
+            else if (cleanCat.includes('給与所得')) {
+              target_salary_shotoku += amt;
+            }
+            else if (cleanCat.includes('売上') || cleanCat.includes('事業収入') || (x.type === 'revenue' && !cleanCat.includes('所得') && !cleanCat.includes('雑') && !cleanCat.includes('還付'))) {
+              target_jigyo_shunyu += amt;
+            }
+            else if (cleanCat.includes('事業所得')) {
+              target_jigyo_shotoku += amt;
+            }
+            else if (cleanCat.includes('社会保険料')) shaho_val += amt;
+            else if (cleanCat.includes('小規模企業共済')) shokibo_val += amt;
+            else if (cleanCat.includes('生命保険料')) life_val += amt;
+            else if (cleanCat.includes('配偶者')) spouse_val += amt;
+            else if (cleanCat.includes('基礎控除')) basic_val += amt;
+            else if (x.type === 'expense') {
+              expense_total += amt;
+              if (kessanExps[cleanCat] !== undefined) {
+                kessanExps[cleanCat] += amt;
+              } else {
+                kessanExps['雑費'] += amt;
+              }
+            }
+        });
+        
+        // 総合所得金額の合計 ⑨ （抽出された「給与所得」＋「事業所得」をそのまま合算）
+        const total_income = target_salary_shotoku + target_jigyo_shotoku; 
+        
+        // 所得控除合計 ㉕
+        const total_deductions = shaho_val + shokibo_val + life_val + spouse_val + basic_val;
+        
+        // 課税所得 ㉖
+        const taxable_income = Math.max(0, total_income - total_deductions);
+        
+        // 国税庁基準：1,000円未満切り捨て
+        const final_taxable_income = Math.floor(taxable_income / 1000) * 1000;
+        
+        // 帳票和暦ヘッダーの適用
+        const warekiLabel = getWareki(state.currentYear);
+        document.getElementById('sheetB-year-title').innerText = `${warekiLabel}分`;
+        document.getElementById('kessan-year-title').innerText = `${warekiLabel}分`;
+        
+        // 第一表マス目への完全固定反映
+        document.getElementById('bB-rev-raw').innerText = target_jigyo_shunyu > 0 ? target_jigyo_shunyu.toLocaleString() : '0';
+        document.getElementById('bB-business-income').innerText = target_jigyo_shotoku >= 0 ? target_jigyo_shotoku.toLocaleString() : '▲ ' + Math.abs(target_jigyo_shotoku).toLocaleString();
+        if (target_jigyo_shotoku < 0) {
+          document.getElementById('bB-business-income').className = "col-span-4 tax-value p-2.5 flex items-center justify-end text-rose-500 font-bold bg-rose-50/20";
+        } else {
+          document.getElementById('bB-business-income').className = "col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-800 font-bold";
+        }
+        
+        document.getElementById('bB-salary-raw').innerText = target_salary_shunyu > 0 ? target_salary_shunyu.toLocaleString() : '0';
+        document.getElementById('bB-salary-income').innerText = target_salary_shotoku > 0 ? target_salary_shotoku.toLocaleString() : '0';
+        document.getElementById('bB-total-income').innerText = total_income.toLocaleString();
+        
+        // 所得控除
+        document.getElementById('bB-ded-shaho').innerText = shaho_val > 0 ? shaho_val.toLocaleString() : '0';
+        document.getElementById('bB-ded-shokibo').innerText = shokibo_val > 0 ? shokibo_val.toLocaleString() : '0';
+        document.getElementById('bB-ded-life').innerText = life_val > 0 ? life_val.toLocaleString() : '0';
+        document.getElementById('bB-ded-spouse').innerText = spouse_val > 0 ? spouse_val.toLocaleString() : '0';
+        document.getElementById('bB-ded-basic').innerText = basic_val > 0 ? basic_val.toLocaleString() : '0';
+        document.getElementById('bB-total-deductions').innerText = total_deductions > 0 ? total_deductions.toLocaleString() : '0';
+        
+        // 最終課税所得金額
+        document.getElementById('bB-taxable-income').innerText = final_taxable_income.toLocaleString();
+        
+        // 収支内訳書側への適用
+        const kessanContainer = document.getElementById('kessan-expense-tbody');
+        kessanContainer.innerHTML = Object.entries(kessanExps).map(([k, v]) => `
+          <div class="grid grid-cols-12 tax-row">
+          <div class="col-span-6 tax-label p-2.5 border-r border-slate-300 flex items-center">
+          <span>${k}</span>
+          </div>
+          <div class="col-span-6 tax-value p-2.5 flex items-center justify-end text-slate-700 font-bold bg-white">
+          ${v > 0 ? v.toLocaleString() : '0'}
+          </div>
+          </div>
+        `).join('');
+        document.getElementById('kessan-total-expense').innerText = expense_total > 0 ? expense_total.toLocaleString() : '0';
+        
+        document.getElementById('data-count').innerText = `${yr.length}件`;
+        
+        // 下部の明細一覧テーブル
+        const tbody = document.getElementById('data-tbody');
+        tbody.innerHTML = yr.length ? yr.map(x => {
+            let badgeClass = "bg-slate-100 text-slate-600";
+            let typeText = "経費";
+            if(x.type==='salary') { badgeClass = "bg-blue-50 text-blue-600"; typeText = "給与"; }
+            else if(x.type==='revenue') { badgeClass = "bg-emerald-50 text-emerald-600"; typeText = "売上"; }
+            else if(x.type==='expense') { badgeClass = "bg-rose-50 text-rose-600"; typeText = "経費"; }
+            else if(x.type==='deduction') { badgeClass = "bg-indigo-50 text-indigo-600"; typeText = "控除"; }
+            
+            return `
+            <tr class="hover:bg-slate-50/50">
+            <td class="p-3 text-xs font-bold text-slate-500">${x.date}</td>
+            <td class="p-3 text-xs font-bold">
+            <span class="px-2 py-0.5 rounded-md ${badgeClass}">${typeText}</span>
+            </td>
+            <td class="p-3 text-xs font-black text-slate-700">${x.category}</td>
+            <td class="p-3 text-xs text-slate-600 max-w-[150px] truncate" title="${x.title}">${x.title}</td>
+            <td class="p-3 text-xs font-black text-right text-slate-800">¥${x.amount.toLocaleString()}</td>
+            <td class="p-3 text-center">
+            <button onclick="deleteRow(${x.id})" class="text-slate-300 hover:text-rose-500 p-1.5 active-scale touch-target"><i class="fa-solid fa-trash-can"></i></button>
+            </td>
+            </tr>`;
+        }).join('') : `
+        <tr>
+        <td colspan="6" class="p-12 text-center text-slate-400">
+        <i class="fa-regular fa-folder-open text-2xl mb-2 block"></i>
+        <p class="text-xs font-bold">取引データが登録されていません</p>
+        </td>
+        </tr>`;
+      }
+      
+      // 誤って読み込まれた古いデータを一括で消去する機能を追加
+      function deleteAllDataInYear() {
+        if (!confirm(`本当に${getWareki(state.currentYear)}分のデータをすべて削除してリセットしますか？`)) return;
+        showToast("一括削除中...", "load");
+        
+        const recordsToDelete = state.records.filter(r => r.year === state.currentYear);
+        
+        if (typeof google !== 'undefined' && google.script) {
+          // GAS環境での一括削除（1件ずつ削除処理を呼び出すか、GAS側にBulkDeleteを用意するのがベターだが今回はループ処理）
+          Promise.all(recordsToDelete.map(r => new Promise((resolve) => {
+                  google.script.run.withSuccessHandler(resolve).deleteData(r.id);
+          }))).then(() => {
+              google.script.run.withSuccessHandler(res => {
+                  state.records = res;
+                  closeToast();
+                  renderDashboard();
+              }).getData();
+          });
+        } else {
+          setTimeout(() => {
+              state.records = state.records.filter(r => r.year !== state.currentYear);
+              localStorage.setItem('shinkoku_ledger', JSON.stringify(state.records));
+              closeToast();
+              renderDashboard();
+          }, 800);
+        }
+      }
+      
+      // --- TOAST NOTIFICATIONS ---
+      function showToast(text, mode='load') {
+        document.getElementById('toast-overlay').classList.remove('hidden');
+        document.getElementById('toast-spinner').classList.add('hidden');
+        document.getElementById('toast-icon-success').classList.add('hidden');
+        document.getElementById('toast-icon-error').classList.add('hidden');
+        document.getElementById('toast-close').classList.add('hidden');
+        document.getElementById('toast-text').innerText = text;
+        
+        if (mode === 'load') {
+          document.getElementById('toast-spinner').classList.remove('hidden');
+        } else if (mode === 'success') {
+          document.getElementById('toast-icon-success').classList.remove('hidden');
+        } else {
+          document.getElementById('toast-icon-error').classList.remove('hidden');
+          document.getElementById('toast-close').classList.remove('hidden');
+        }
+      }
+      
+      function closeToast() {
+        document.getElementById('toast-overlay').classList.add('hidden');
+      }
+      
+      // --- CAMERA RECEIPT / DOCUMENT OCR PROCESS ---
+      function processFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const isPdf = file.type === 'application/pdf';
+        const isData = file.name.endsWith('.data') || file.type === 'application/octet-stream';
+        
+        let loadMsg = "解析しています...";
+        if (state.scanMode === 'receipt') {
+          loadMsg = isPdf ? "AIがPDF領収書を解析しています..." : "AIがレシート画像を解析しています...";
+        } else {
+          if (isData) loadMsg = "AIがe-Taxの.dataセーブファイルを解析しています...";
+          else if (isPdf) loadMsg = "AIがPDF申告書をネイティブ解析しています...";
+          else loadMsg = "AIが申告書画像を解析しています...";
+        }
+        
+        showToast(loadMsg, "load");
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          if (typeof google !== 'undefined' && google.script) {
+            const successHandler = results => {
+              if (!results || (state.scanMode === 'receipt' && results.length === 0) || (state.scanMode === 'document' && (!results.items || results.items.length === 0))) {
+                showToast("PDF/画像データから情報を見つけられませんでした。ファイル形式を確認し再度お試しください。", "error");
+                return;
+              }
+              closeToast();
+              if (state.scanMode === 'receipt') {
+                displayOcrResults(results);
+              } else {
+                displayDocOcrResults(results);
+              }
+            };
+            
+            const errorHandler = err => {
+              showToast("解析エラー: " + err, "error");
+            };
+            
+            const fileMime = isData ? 'application/octet-stream' : file.type;
+            
+            if (state.scanMode === 'receipt') {
+              google.script.run.withSuccessHandler(successHandler).withFailureHandler(errorHandler).analyzeImage(e.target.result, fileMime);
+            } else {
+              google.script.run.withSuccessHandler(successHandler).withFailureHandler(errorHandler).analyzeTaxDocument(e.target.result, fileMime);
+            }
+          } else {
+            setTimeout(() => {
+                closeToast();
+                if (state.scanMode === 'receipt') {
+                  const mockResults = [{
+                    date: new Date().toISOString().substring(0,10),
+                    shop: "PDFインポートテスト店舗",
+                    amount: 24500,
+                    category: "消耗品費",
+                    memo: "PDF領収書解析(Demo)"
+                  }];
+                  displayOcrResults(mockResults);
+                } else {
+                  // デモモード用 H24完全再現モック
+                  const mockResults = {
+                    year: 2012,
+                    items: [
+                    { type: "salary", category: "給与収入", title: "給与支払金額(PDF)", amount: 2706097 },
+                    { type: "salary", category: "給与所得", title: "給与所得控除後(PDF)", amount: 1712800 },
+                    { type: "revenue", category: "売上・事業収入", title: "事業売上金額(PDF)", amount: 499999 },
+                    { type: "revenue", category: "事業所得", title: "事業所得金額(PDF)", amount: 146042 },
+                    { type: "expense", category: "給料賃金", title: "雇人費等(PDF)", amount: 163500 },
+                    { type: "expense", category: "減価償却費", title: "減価償却(PDF)", amount: 146802 },
+                    { type: "expense", category: "旅費交通費", title: "旅費交通費(PDF)", amount: 39710 },
+                    { type: "expense", category: "消耗品費", title: "消耗品費(PDF)", amount: 7900 },
+                    { type: "deduction", category: "社会保険料控除", title: "社会保険(PDF)", amount: 282337 },
+                    { type: "deduction", category: "基礎控除", title: "基礎控除(PDF)", amount: 380000 }
+                    ]
+                  };
+                  displayDocOcrResults(mockResults);
+                }
+            }, 2000);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+      
+      function displayOcrResults(results) {
+        state.pendingOcr = results;
+        document.getElementById('ocr-results-box').classList.remove('hidden');
+        document.getElementById('ocr-item-count').innerText = `${results.length}件`;
+        
+        const container = document.getElementById('ocr-items-container');
+        container.innerHTML = results.map((item, idx) => `
+          <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4 shadow-inner">
+          <div class="space-y-1">
+          <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest">店名 / 内容</label>
+          <input type="text" value="${item.shop || item.title || ''}" onchange="updateOcrItem(${idx}, 'shop', this.value)" class="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-800 outline-none focus:border-primary-500">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1">
+          <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest">日付</label>
+          <input type="date" value="${item.date || ''}" onchange="updateOcrItem(${idx}, 'date', this.value)" class="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-800 outline-none focus:border-primary-500">
+          </div>
+          <div class="space-y-1">
+          <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest">金額</label>
+          <input type="number" value="${item.amount || ''}" onchange="updateOcrItem(${idx}, 'amount', this.value)" class="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs font-black text-indigo-600 outline-none focus:border-primary-500">
+          </div>
+          </div>
+          <div class="space-y-1">
+          <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest">推奨カテゴリ(科目)</label>
+          <select onchange="updateOcrItem(${idx}, 'category', this.value)" class="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-700 outline-none focus:border-primary-500">
+          ${CATS.expense.map(c => `<option value="${c}" ${item.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+          </select>
+          </div>
+          </div>
+        `).join('');
+        
+        document.getElementById('ocr-results-box').scrollIntoView({ behavior: 'smooth' });
+      }
+      
+      function displayDocOcrResults(docResult) {
+        const targetYear = docResult.year || new Date().getFullYear();
+        const targetDate = `${targetYear}-12-31`; 
+        
+        state.pendingOcr = docResult.items.map(item => ({
+              date: targetDate,
+              title: item.title,
+              amount: item.amount,
+              category: item.category,
+              type: item.type,
+              memo: `${targetYear}年 e-Taxデータ取込`
+        }));
+        
+        document.getElementById('ocr-results-box').classList.remove('hidden');
+        document.getElementById('ocr-item-count').innerText = `${state.pendingOcr.length}件 (${targetYear}年度分)`;
+        
+        const container = document.getElementById('ocr-items-container');
+        container.innerHTML = `
+        <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-xs font-bold text-indigo-800 mb-3 text-center">
+        <i class="fa-solid fa-circle-info mr-1"></i> ${targetYear}年度のe-Taxデータ（全${state.pendingOcr.length}件）から高精度にテキスト解析されました。
+        </div>
+        ` + state.pendingOcr.map((item, idx) => {
+            let badgeColor = "bg-slate-100 text-slate-600 border-slate-200";
+            let selectableCats = [];
+            if (item.type === 'salary') { badgeColor = "bg-blue-50 text-blue-600 border-blue-200"; selectableCats = CATS.salary; }
+            else if (item.type === 'revenue') { badgeColor = "bg-emerald-50 text-emerald-600 border-emerald-200"; selectableCats = CATS.revenue; }
+            else if (item.type === 'expense') { badgeColor = "bg-rose-50 text-rose-600 border-rose-200"; selectableCats = CATS.expense; }
+            else if (item.type === 'deduction') { badgeColor = "bg-indigo-50 text-indigo-600 border-indigo-200"; selectableCats = CATS.deduction; }
+            
+            return `
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 relative">
+            <div class="flex justify-between items-center border-b pb-2">
+            <span class="text-xs font-black px-2 py-0.5 rounded border ${badgeColor}">${item.type === 'salary' ? '給与(収入/所得)' : item.type === 'revenue' ? '事業(売上/所得)' : item.type === 'expense' ? '必要経費' : '所得控除'}</span>
+            <input type="date" value="${item.date}" onchange="updateOcrItem(${idx}, 'date', this.value)" class="bg-transparent text-xs font-bold text-slate-500 outline-none max-w-[120px] text-right">
+            </div>
+            <div class="space-y-1">
+            <label class="text-[9px] font-black text-slate-400 tracking-wider">項目名称 / 取引・勤務先</label>
+            <input type="text" value="${item.title || ''}" onchange="updateOcrItem(${idx}, 'title', this.value)" class="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-800 outline-none">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+            <div>
+            <label class="text-[9px] font-black text-slate-400 tracking-wider">勘定科目（自動マッピング）</label>
+            <select onchange="updateOcrItem(${idx}, 'category', this.value)" class="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 outline-none">
+            ${selectableCats.map(c => `<option value="${c}" ${item.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+            </select>
+            </div>
+            <div>
+            <label class="text-[9px] font-black text-slate-400 tracking-wider">金額 (¥)</label>
+            <input type="number" value="${item.amount || 0}" onchange="updateOcrItem(${idx}, 'amount', this.value)" class="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-black text-indigo-600 text-right outline-none">
+            </div>
+            </div>
+            </div>`;
+        }).join('');
+        
+        document.getElementById('ocr-results-box').scrollIntoView({ behavior: 'smooth' });
+      }
+      
+      function updateOcrItem(idx, field, value) {
+        state.pendingOcr[idx][field] = (field === 'amount') ? parseInt(value) : value;
+      }
+      
+      function cancelOcr() {
+        state.pendingOcr = [];
+        document.getElementById('ocr-results-box').classList.add('hidden');
+        document.getElementById('cameraInput').value = '';
+      }
+      
+      function saveOcrResults() {
+        if (!state.pendingOcr.length) return;
+        showToast("スプレッドシートに保存しています...", "load");
+        
+        const formattedItems = state.pendingOcr.map(x => ({
+              date: x.date || new Date().toISOString().substring(0,10),
+              title: x.title || x.shop || "一括解析読込",
+              amount: parseInt(x.amount) || 0,
+              category: x.category,
+              type: x.type,
+              memo: x.memo || "AI申告データ解析"
+        }));
+        
+        if (formattedItems.length > 0) {
+          const parseYear = new Date(formattedItems[0].date).getFullYear();
+          if (!isNaN(parseYear) && parseYear > 1900) {
+            state.currentYear = parseYear;
+          }
+        }
+        
+        if (typeof google !== 'undefined' && google.script) {
+          google.script.run
+          .withSuccessHandler(res => {
+              state.records = res;
+              showToast("保存完了しました！", "success");
+              setTimeout(() => {
+                  closeToast();
+                  cancelOcr();
+                  switchTab('app');
+                  renderDashboard();
+                  renderYears();
+              }, 1200);
+          })
+          .withFailureHandler(err => {
+              showToast("保存失敗: " + err, "error");
+          })
+          .addBulkData(formattedItems);
+        } else {
+          setTimeout(() => {
+              formattedItems.forEach(item => {
+                  state.records.push({
+                      id: state.records.length + 1,
+                      year: new Date(item.date).getFullYear(),
+                      ...item
+                  });
+              });
+              localStorage.setItem('shinkoku_ledger', JSON.stringify(state.records));
+              showToast("保存完了しました(デモ)！", "success");
+              setTimeout(() => {
+                  closeToast();
+                  cancelOcr();
+                  switchTab('app');
+                  renderDashboard();
+                  renderYears();
+              }, 1200);
+          }, 1000);
+        }
+      }
+      
+      function parseImport() {
+        const text = document.getElementById('import-area').value.trim();
+        if (!text) return;
+        const rows = text.split('\n');
+        const parsed = [];
+        
+        rows.forEach(line => {
+            const parts = line.split(/[,\t]/);
+            if (parts.length < 4) return;
+            const d = parts[0].trim();
+            const amt = parseInt(parts[3].replace(/[^0-9]/g, ''));
+            if (!isNaN(amt)) {
+              parsed.push({ 
+                  year: new Date(d).getFullYear(), 
+                  date: d, 
+                  category: parts[1].trim(), 
+                  title: parts[2].trim(), 
+                  amount: amt, 
+                  type: 'expense' 
+              });
+            }
+        });
+        
+        state.pendingImport = parsed;
+        if (parsed.length) {
+          document.getElementById('import-preview-box').classList.remove('hidden');
+          document.getElementById('imp-count').innerText = parsed.length;
+          document.getElementById('imp-tbody').innerHTML = parsed.map(p => `
+            <tr class="border-b">
+            <td class="p-3 font-semibold text-slate-500">${p.date}</td>
+            <td class="p-3 font-bold text-slate-700">${p.category}</td>
+            <td class="p-3 text-slate-600">${p.title}</td>
+            <td class="p-3 text-right font-black">¥${p.amount.toLocaleString()}</td>
+            </tr>
+          `).join('');
+          document.getElementById('import-preview-box').scrollIntoView({ behavior: 'smooth' });
+        }
+      }
+      
+      function execImport() {
+        if (!state.pendingImport.length) return;
+        showToast("一括処理を実行中...", "load");
+        
+        if (typeof google !== 'undefined' && google.script) {
+          google.script.run
+          .withSuccessHandler(res => { 
+              state.records = res; 
+              state.pendingImport = [];
+              document.getElementById('import-area').value = '';
+              document.getElementById('import-preview-box').classList.add('hidden');
+              showToast("一括取り込みに成功しました！", "success");
+              setTimeout(() => {
+                  closeToast();
+                  switchTab('app'); 
+                  renderDashboard();
+                  renderYears();
+              }, 1200);
+          })
+          .withFailureHandler(err => {
+              showToast("インポートエラー: " + err, "error");
+          })
+          .addBulkData(state.pendingImport);
+        } else {
+          state.records.push(...state.pendingImport.map((x, i) => ({ id: state.records.length + i + 1, ...x })));
+          localStorage.setItem('shinkoku_ledger', JSON.stringify(state.records));
+          state.pendingImport = []; 
+          document.getElementById('import-area').value = '';
+          document.getElementById('import-preview-box').classList.add('hidden');
+          showToast("一括取り込み完了(デモ)", "success");
+          setTimeout(() => {
+              closeToast();
+              switchTab('app'); 
+              renderDashboard();
+              renderYears();
+          }, 1200);
+        }
+      }
+      
+      function handleFormSubmit(e) {
+        e.preventDefault();
+        showToast("登録データを保存中...", "load");
+        
+        const inputDate = document.getElementById('input-date').value;
+        const data = {
+          year: new Date(inputDate).getFullYear(),
+          date: inputDate,
+          type: document.querySelector('input[name="type"]:checked').value,
+          category: document.getElementById('input-category').value,
+          title: document.getElementById('input-title').value,
+          amount: parseInt(document.getElementById('input-amount').value),
+          memo: ""
+        };
+        
+        state.currentYear = data.year;
+        
+        if (typeof google !== 'undefined' && google.script) {
+          google.script.run
+          .withSuccessHandler(res => { 
+              state.records = res; 
+              closeToast();
+              switchTab('app');
+              renderDashboard(); 
+              renderYears(); 
+          })
+          .withFailureHandler(err => {
+              showToast("登録失敗: " + err, "error");
+          })
+          .addData(data);
+        } else {
+          setTimeout(() => {
+              state.records.push({ id: state.records.length + 1, ...data });
+              localStorage.setItem('shinkoku_ledger', JSON.stringify(state.records));
+              closeToast();
+              switchTab('app');
+              renderDashboard(); 
+              renderYears();
+          }, 500);
+        }
+        e.target.reset(); 
+        document.getElementById('preview-val').innerText = '';
+        document.getElementById('preview-val-kanji').innerText = '';
+        updateDropdown();
+        selectManualType('salary'); 
+      }
+      
+      function deleteRow(id) {
+        if (!confirm('この明細行を完全に削除しますか？')) return;
+        showToast("削除中...", "load");
+        
+        if (typeof google !== 'undefined' && google.script) {
+          google.script.run
+          .withSuccessHandler(res => { 
+              state.records = res; 
+              closeToast();
+              renderDashboard(); 
+          })
+          .withFailureHandler(err => {
+              showToast("削除失敗: " + err, "error");
+          })
+          .deleteData(id);
+        } else {
+          setTimeout(() => {
+              state.records = state.records.filter(r => r.id !== id);
+              localStorage.setItem('shinkoku_ledger', JSON.stringify(state.records));
+              closeToast();
+              renderDashboard();
+          }, 400);
+        }
+      }
+      
+      function renderReport() {
+        const yr = state.records.filter(r => r.year === state.currentYear);
+        
+        let s_raw = 0;
+        const ag = { revenue: {}, expense: {}, deduction: {} };
+        let rtot = 0, etot = 0, dtot = 0;
+        
+        yr.forEach(x => {
+            if (x.type === 'salary') {
+              s_raw += x.amount;
+            } else {
+              const t = x.type;
+              ag[t][x.category] = (ag[t][x.category] || 0) + x.amount;
+              if (t === 'revenue') rtot += x.amount;
+              else if (t === 'expense') etot += x.amount;
+              else if (t === 'deduction') dtot += x.amount;
+            }
+        });
+        
+        // e-Tax転記レポート用には、給与額面に対する国税庁基準の自動計算を参考までに表示
+        let s_income_calc = 0;
+        if (s_raw <= 1625000) s_income_calc = Math.max(0, s_raw - 550000);
+        else if (s_raw <= 1800000) s_income_calc = Math.max(0, s_raw - (s_raw * 0.40 - 100000));
+        else if (s_raw <= 3600000) s_income_calc = Math.max(0, s_raw - (s_raw * 0.30 + 80000));
+        else if (s_raw <= 6600000) s_income_calc = Math.max(0, s_raw - (s_raw * 0.20 + 440000));
+        else if (s_raw <= 8500000) s_income_calc = Math.max(0, s_raw - (s_raw * 0.10 + 1100000));
+        else s_income_calc = Math.max(0, s_raw - 1950000);
+        
+        const business_income = rtot - etot;
+        const total_income = Math.max(0, s_income_calc + business_income);
+        const taxable_income = Math.max(0, total_income - dtot);
+        
+        document.getElementById('rep-sal-total').innerText = `源泉徴収額面金額合計: ¥${s_raw.toLocaleString()}`;
+        document.getElementById('rep-salary-block').innerHTML = `
+        <div class="flex justify-between items-center py-2 border-b">
+        <span>給与の支払金額（支払金額）</span>
+        <span class="font-mono font-black text-slate-700">¥${s_raw.toLocaleString()} 
+        <button onclick="copyToClip('${s_raw}')" class="text-[10px] text-primary-600 border border-primary-100 hover:bg-primary-50 rounded py-0.5 px-2 ml-1">コピー</button>
+        </span>
+        </div>
+        <div class="flex justify-between items-center py-2 border-b">
+        <span>給与所得控除後の金額（※現在税制の参考計算値）</span>
+        <span class="font-mono font-black text-slate-700">¥${Math.round(s_income_calc).toLocaleString()} 
+        <button onclick="copyToClip('${Math.round(s_income_calc)}')" class="text-[10px] text-primary-600 border border-primary-100 hover:bg-primary-50 rounded py-0.5 px-2 ml-1">コピー</button>
+        </span>
+        </div>
+        <p class="text-[10px] text-slate-400 mt-1">※e-Taxの「給与所得の入力」欄には、源泉徴収票に印字された数値をそのまま入力してください。</p>
+        `;
+        
+        const renderRows = (obj) => {
+          if(Object.keys(obj).length === 0) return '<div class="py-4 text-slate-400 font-bold text-center">該当データなし</div>';
+          return Object.entries(obj).map(([k, v]) => `
+            <div class="flex justify-between items-center py-2 border-b font-bold">
+            <span class="text-slate-600">${k}</span>
+            <span class="font-mono text-slate-800">¥${v.toLocaleString()} 
+            <button onclick="copyToClip('${v}')" class="text-[10px] text-primary-600 border border-primary-100 hover:bg-primary-50 rounded py-0.5 px-2 ml-1">コピー</button>
+            </span>
+          </div>`).join('');
+        };
+        
+        document.getElementById('rep-rev').innerHTML = renderRows(ag.revenue);
+        document.getElementById('rep-exp').innerHTML = renderRows(ag.expense);
+        document.getElementById('rep-exp-total').innerText = `必要経費合計: ¥${etot.toLocaleString()}`;
+        
+        document.getElementById('rep-ded').innerHTML = renderRows(ag.deduction);
+        document.getElementById('rep-ded-total').innerText = `所得控除額合計: ¥${dtot.toLocaleString()}`;
+        
+        document.getElementById('rep-income').innerText = '¥' + Math.floor(taxable_income / 1000) * 1000;
+        document.getElementById('rep-title').innerText = getWareki(state.currentYear) + '分 e-Tax連携転記レポート';
+      }
+      
+      function copyToClip(text) {
+        const area = document.createElement('textarea'); 
+        area.value = text; 
+        document.body.appendChild(area); 
+        area.select(); 
+        document.execCommand('copy'); 
+        document.body.removeChild(area);
+        
+        showToast("転記データをコピーしました: ¥" + parseInt(text).toLocaleString(), "success");
+        setTimeout(closeToast, 800);
+      }
+    </script>
+  </body>
+</html>
