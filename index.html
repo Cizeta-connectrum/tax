@@ -560,6 +560,10 @@
             <h3 class="font-bold text-sm text-slate-700 mb-3"><i class="fa-solid fa-receipt text-rose-600 mr-1"></i>必要経費率の推移（必要経費÷事業収入）</h3>
             <canvas id="chart-expense-ratio" height="220"></canvas>
           </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+            <h3 class="font-bold text-sm text-slate-700 mb-3"><i class="fa-solid fa-money-check text-green-600 mr-1"></i>納付/還付額の推移（源泉徴収税額 vs 申告納税額）</h3>
+            <canvas id="chart-tax-payment" height="220"></canvas>
+          </div>
         </div>
 
         <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
@@ -572,6 +576,8 @@
                   <th class="p-3 font-bold text-right">総所得</th>
                   <th class="p-3 font-bold text-right">課税所得</th>
                   <th class="p-3 font-bold text-right">所得税額</th>
+                  <th class="p-3 font-bold text-right">源泉徴収税額</th>
+                  <th class="p-3 font-bold text-right">申告納税額</th>
                   <th class="p-3 font-bold text-right">前年比（総所得）</th>
                   <th class="p-3 font-bold text-right">前年比（所得税額）</th>
                 </tr>
@@ -1548,7 +1554,8 @@
       }
       
       function computeYearStats(yr) {
-        let salary_income = 0, business_income = 0, business_revenue = 0, expense_total = 0, tax_total = 0;
+        let salary_income = 0, business_income = 0, business_revenue = 0, expense_total = 0;
+        let tax_total = 0, tax_withholding = 0, tax_final = 0, tax_gross = 0, tax_net = 0, tax_reconstruction = 0;
         yr.forEach(x => {
             const cleanCat = x.category.trim();
             const amt = Number(x.amount) || 0;
@@ -1556,12 +1563,19 @@
             else if (cleanCat.includes('事業所得')) business_income += amt;
             else if (cleanCat.includes('売上') || cleanCat.includes('事業収入') || (x.type === 'revenue' && !cleanCat.includes('所得') && !cleanCat.includes('雑') && !cleanCat.includes('還付'))) business_revenue += amt;
             else if (x.type === 'expense') expense_total += amt;
-            else if (x.type === 'tax' && cleanCat === '所得税及び復興特別所得税の額') tax_total += amt;
+            else if (x.type === 'tax') {
+              if (cleanCat === '所得税及び復興特別所得税の額') tax_total += amt;
+              else if (cleanCat === '源泉徴収税額') tax_withholding += amt;
+              else if (cleanCat === '申告納税額') tax_final += amt;
+              else if (cleanCat === '算出税額') tax_gross += amt;
+              else if (cleanCat === '差引所得税額') tax_net += amt;
+              else if (cleanCat === '復興特別所得税額') tax_reconstruction += amt;
+            }
         });
         const total_income = salary_income + business_income;
         const total_deductions = yr.filter(x => x.type === 'deduction').reduce((s, x) => s + (Number(x.amount) || 0), 0);
         const taxable_income = Math.max(0, total_income - total_deductions);
-        return { salary_income, business_income, business_revenue, expense_total, tax_total, total_income, taxable_income };
+        return { salary_income, business_income, business_revenue, expense_total, tax_total, tax_withholding, tax_final, tax_gross, tax_net, tax_reconstruction, total_income, taxable_income };
       }
 
       let analysisCharts = {};
@@ -1587,6 +1601,8 @@
         const salaryIncomeArr = stats.map(s => s.salary_income);
         const businessIncomeArr = stats.map(s => s.business_income);
         const expenseRatioArr = stats.map(s => s.business_revenue > 0 ? (s.expense_total / s.business_revenue * 100) : 0);
+        const taxWithholdingArr = stats.map(s => s.tax_withholding);
+        const taxFinalArr = stats.map(s => s.tax_final);
 
         Object.values(analysisCharts).forEach(c => c && c.destroy());
 
@@ -1633,6 +1649,22 @@
           options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
         });
 
+        analysisCharts.taxPayment = new Chart(document.getElementById('chart-tax-payment'), {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [
+              { label: '源泉徴収税額', data: taxWithholdingArr, backgroundColor: '#0ea5e9' },
+              { label: '申告納税額', data: taxFinalArr, backgroundColor: (ctx) => taxFinalArr[ctx.dataIndex] >= 0 ? '#dc2626' : '#10b981' }
+            ]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } },
+            scales: { y: { beginAtZero: true } }
+          }
+        });
+
         const tbody = document.getElementById('analysis-compare-tbody');
         tbody.innerHTML = years.map((y, i) => {
           const s = stats[i];
@@ -1641,12 +1673,16 @@
           const incomeChange = prev ? pct(s.total_income, prev.total_income) : '-';
           const taxChange = prev ? pct(s.tax_total, prev.tax_total) : '-';
           const colorClass = (v) => v === '-' ? 'text-slate-400' : (v.startsWith('-') ? 'text-emerald-600' : 'text-rose-600');
+          const finalDisplay = s.tax_final < 0 ? `還付 ¥${Math.abs(s.tax_final).toLocaleString()}` : (s.tax_final > 0 ? `納税 ¥${s.tax_final.toLocaleString()}` : '¥0');
+          const finalColor = s.tax_final < 0 ? 'text-emerald-600' : (s.tax_final > 0 ? 'text-rose-600' : 'text-slate-400');
           return `
           <tr>
             <td class="p-3 font-bold">${getWareki(y)}分</td>
             <td class="p-3 text-right font-mono">¥${s.total_income.toLocaleString()}</td>
             <td class="p-3 text-right font-mono">¥${s.taxable_income.toLocaleString()}</td>
             <td class="p-3 text-right font-mono">¥${s.tax_total.toLocaleString()}</td>
+            <td class="p-3 text-right font-mono">¥${s.tax_withholding.toLocaleString()}</td>
+            <td class="p-3 text-right font-mono font-bold ${finalColor}">${finalDisplay}</td>
             <td class="p-3 text-right font-mono font-bold ${colorClass(incomeChange)}">${incomeChange}</td>
             <td class="p-3 text-right font-mono font-bold ${colorClass(taxChange)}">${taxChange}</td>
           </tr>`;
