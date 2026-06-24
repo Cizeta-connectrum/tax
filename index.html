@@ -1056,9 +1056,9 @@
           target_salary_shotoku = Math.max(0, target_salary_shunyu - salary_deduction);
         }
 
-        // 事業所得①を計算（PDFから抽出されていなければ自動計算）
+        // 事業所得①を計算（PDFから抽出されていなければ自動計算。赤字の場合はマイナスのまま保持する）
         if (target_jigyo_shotoku === 0 && target_jigyo_shunyu > 0) {
-          target_jigyo_shotoku = Math.max(0, target_jigyo_shunyu - expense_total);
+          target_jigyo_shotoku = target_jigyo_shunyu - expense_total;
         }
 
         // 総合所得金額の合計 ⑨ （抽出された「給与所得」＋「事業所得」をそのまま合算）
@@ -1251,8 +1251,12 @@
           </div>
         `;
 
-        // Part 3: 事業所得（自動計算）
-        const businessIncome = Math.max(0, target_jigyo_shunyu - expense_total);
+        // Part 3: 事業所得（自動計算、マイナスの場合は赤字▲表示）
+        const businessIncomeRaw = target_jigyo_shunyu - expense_total;
+        const businessIncomeDisplay = businessIncomeRaw < 0
+          ? `▲ ${Math.abs(businessIncomeRaw).toLocaleString()}`
+          : businessIncomeRaw.toLocaleString();
+        const incomeValueClass = businessIncomeRaw < 0 ? 'text-rose-600 font-bold' : 'text-blue-700 font-bold';
         const incomeHtml = `
           <div class="grid grid-cols-12 tax-row bg-blue-50/30 font-bold">
             <div class="col-span-8 tax-label p-2.5 border-r border-slate-300 flex items-center bg-blue-100/50">
@@ -1262,10 +1266,10 @@
           </div>
           <div class="grid grid-cols-12 tax-row font-bold bg-blue-50/50 border-t-2 border-blue-300">
             <div class="col-span-8 tax-label p-2.5 border-r border-slate-300 flex items-center">
-              <span>事業所得①（自動計算）</span>
+              <span>事業所得①（自動計算）${businessIncomeRaw < 0 ? '※赤字' : ''}</span>
             </div>
-            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-blue-700 font-bold">
-              ${businessIncome.toLocaleString()}
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end ${incomeValueClass}">
+              ${businessIncomeDisplay}
             </div>
           </div>
         `;
