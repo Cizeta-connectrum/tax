@@ -1013,53 +1013,46 @@
         }
         document.getElementById('bB-tax-final').innerText = finalDisplay + (taxComputed ? '（参考値）' : '');
 
-        // 源泉徴収票セクション
-        const withholdingRows = yr.filter(x => x.type === 'salary' || (x.type === 'revenue' && x.category.includes('給与')));
+        // 源泉徴収票セクション：income_detailタイプから抽出
+        const incomeDetailRows = yr.filter(x => x.type === 'income_detail');
         const withholdingMap = {};
         let withholdingTotalIncome = 0, withholdingTotalTax = 0;
 
-        yr.forEach(x => {
+        // income_detailから給与源泉関連を集計
+        incomeDetailRows.forEach(x => {
           const cleanCat = x.category.trim();
           const amt = Number(x.amount) || 0;
 
-          if (x.type === 'salary' || (x.type === 'revenue' && cleanCat.includes('給与'))) {
+          if (cleanCat === '給与' || cleanCat === '業務委託' || cleanCat.includes('源泉')) {
             const key = x.title || cleanCat;
             if (!withholdingMap[key]) withholdingMap[key] = { income: 0, withholding: 0 };
-            withholdingMap[key].income += amt;
-            withholdingTotalIncome += amt;
-          }
-        });
 
-        yr.forEach(x => {
-          const cleanCat = x.category.trim();
-          const amt = Number(x.amount) || 0;
-
-          if (x.type === 'tax' && cleanCat === '源泉徴収税額') {
-            const title = x.title || '給与源泉徴収';
-            const key = title.replace('源泉徴収', '').trim() || '給与';
-            if (withholdingMap[key]) {
+            if (cleanCat.includes('源泉')) {
               withholdingMap[key].withholding += amt;
+              withholdingTotalTax += amt;
             } else {
-              withholdingMap[key] = { income: 0, withholding: amt };
+              withholdingMap[key].income += amt;
+              withholdingTotalIncome += amt;
             }
-            withholdingTotalTax += amt;
           }
         });
 
         const withholdingTbody = document.getElementById('withholding-tbody');
-        withholdingTbody.innerHTML = Object.entries(withholdingMap).map(([k, v]) => `
-          <div class="grid grid-cols-12 tax-row">
-            <div class="col-span-4 tax-label p-2.5 border-r border-slate-300 flex items-center text-slate-700">
-              <span>${k}</span>
+        withholdingTbody.innerHTML = Object.entries(withholdingMap).length > 0
+          ? Object.entries(withholdingMap).map(([k, v]) => `
+            <div class="grid grid-cols-12 tax-row">
+              <div class="col-span-4 tax-label p-2.5 border-r border-slate-300 flex items-center text-slate-700">
+                <span>${k}</span>
+              </div>
+              <div class="col-span-4 tax-value p-2.5 flex items-center justify-end border-r border-slate-300 text-slate-700">
+                ${v.income > 0 ? v.income.toLocaleString() : '0'}
+              </div>
+              <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-700">
+                ${v.withholding > 0 ? v.withholding.toLocaleString() : '0'}
+              </div>
             </div>
-            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end border-r border-slate-300 text-slate-700">
-              ${v.income > 0 ? v.income.toLocaleString() : '0'}
-            </div>
-            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-700">
-              ${v.withholding > 0 ? v.withholding.toLocaleString() : '0'}
-            </div>
-          </div>
-        `).join('');
+          `).join('')
+          : '<div class="col-span-12 p-3 text-slate-400 text-center text-xs">データなし</div>';
 
         document.getElementById('withholding-total-income').innerText = withholdingTotalIncome > 0 ? withholdingTotalIncome.toLocaleString() : '0';
         document.getElementById('withholding-total-tax').innerText = withholdingTotalTax > 0 ? withholdingTotalTax.toLocaleString() : '0';
