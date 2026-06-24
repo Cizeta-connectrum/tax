@@ -1014,7 +1014,28 @@
               }
             }
         });
-        
+
+        // 給与所得控除の計算（国税庁基準）
+        let salary_deduction = 0;
+        if (target_salary_shunyu > 0) {
+          if (target_salary_shunyu <= 1625000) salary_deduction = 550000;
+          else if (target_salary_shunyu <= 1800000) salary_deduction = Math.max(0, target_salary_shunyu * 0.40 - 100000);
+          else if (target_salary_shunyu <= 3600000) salary_deduction = target_salary_shunyu * 0.30 + 80000;
+          else if (target_salary_shunyu <= 6600000) salary_deduction = target_salary_shunyu * 0.20 + 440000;
+          else if (target_salary_shunyu <= 8500000) salary_deduction = target_salary_shunyu * 0.10 + 1100000;
+          else salary_deduction = 1950000;
+        }
+
+        // 給与所得⑥を計算（PDFから抽出されていなければ自動計算）
+        if (target_salary_shotoku === 0 && target_salary_shunyu > 0) {
+          target_salary_shotoku = Math.max(0, target_salary_shunyu - salary_deduction);
+        }
+
+        // 事業所得①を計算（PDFから抽出されていなければ自動計算）
+        if (target_jigyo_shotoku === 0 && target_jigyo_shunyu > 0) {
+          target_jigyo_shotoku = Math.max(0, target_jigyo_shunyu - expense_total);
+        }
+
         // 総合所得金額の合計 ⑨ （抽出された「給与所得」＋「事業所得」をそのまま合算）
         const total_income = target_salary_shotoku + target_jigyo_shotoku + target_misc_shunyu;
         
