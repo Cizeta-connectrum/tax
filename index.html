@@ -595,6 +595,10 @@
             <h3 class="font-bold text-sm text-slate-700 mb-3"><i class="fa-solid fa-money-check text-green-600 mr-1"></i>納付/還付額の推移（源泉徴収税額 vs 申告納税額）</h3>
             <canvas id="chart-tax-payment" height="220"></canvas>
           </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+            <h3 class="font-bold text-sm text-slate-700 mb-3"><i class="fa-solid fa-building text-blue-600 mr-1"></i>会社別所得の推移</h3>
+            <canvas id="chart-income-by-company" height="220"></canvas>
+          </div>
         </div>
 
         <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
@@ -1639,6 +1643,8 @@
       function computeYearStats(yr) {
         let salary_income = 0, business_income = 0, business_revenue = 0, expense_total = 0;
         let tax_total = 0, tax_withholding = 0, tax_final = 0, tax_gross = 0, tax_net = 0, tax_reconstruction = 0;
+        const companyIncomeMap = {};
+
         yr.forEach(x => {
             const cleanCat = x.category.trim();
             const amt = Number(x.amount) || 0;
@@ -1654,11 +1660,20 @@
               else if (cleanCat === '差引所得税額') tax_net += amt;
               else if (cleanCat === '復興特別所得税額') tax_reconstruction += amt;
             }
+            else if (x.type === 'income_detail' && cleanCat === '給与') {
+              const extractCompanyName = (title) => {
+                const match = title.match(/[（(](.+)[）)]/);
+                return match ? match[1].trim() : title;
+              };
+              const company = extractCompanyName(x.title || cleanCat);
+              if (!companyIncomeMap[company]) companyIncomeMap[company] = 0;
+              companyIncomeMap[company] += amt;
+            }
         });
         const total_income = salary_income + business_income;
         const total_deductions = yr.filter(x => x.type === 'deduction').reduce((s, x) => s + (Number(x.amount) || 0), 0);
         const taxable_income = Math.max(0, total_income - total_deductions);
-        return { salary_income, business_income, business_revenue, expense_total, tax_total, tax_withholding, tax_final, tax_gross, tax_net, tax_reconstruction, total_income, taxable_income };
+        return { salary_income, business_income, business_revenue, expense_total, tax_total, tax_withholding, tax_final, tax_gross, tax_net, tax_reconstruction, total_income, taxable_income, companyIncomeMap };
       }
 
       let analysisCharts = {};
@@ -1763,6 +1778,30 @@
             scales: { y: { beginAtZero: true } }
           }
         });
+
+        // 会社別所得推移グラフ
+        const allCompanies = [...new Set(stats.flatMap(s => Object.keys(s.companyIncomeMap || {})))];
+        if (allCompanies.length > 0) {
+          const companyDatasets = allCompanies.map((company, idx) => {
+            const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+            return {
+              label: company,
+              data: stats.map(s => (s.companyIncomeMap && s.companyIncomeMap[company]) || 0),
+              borderColor: colors[idx % colors.length],
+              backgroundColor: colors[idx % colors.length],
+              tension: 0.3
+            };
+          });
+
+          analysisCharts.incomeByCompany = new Chart(document.getElementById('chart-income-by-company'), {
+            type: 'line',
+            data: {
+              labels,
+              datasets: companyDatasets
+            },
+            options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } }, scales: { y: { beginAtZero: true } } }
+          });
+        }
 
         const tbody = document.getElementById('analysis-compare-tbody');
         tbody.innerHTML = years.map((y, i) => {
