@@ -1018,10 +1018,10 @@
         const withholdingMap = {};
         let withholdingTotalIncome = 0, withholdingTotalTax = 0;
 
-        // titleから会社名を抽出（「給与（会社名）」→「会社名」）
+        // titleから会社名を抽出（「給与（会社名）」または「給与(会社名)」→「会社名」、全角・半角括弧両対応）
         const extractCompanyName = (title) => {
-          const match = title.match(/（(.+)）/);
-          return match ? match[1] : title;
+          const match = title.match(/[（(](.+)[）)]/);
+          return match ? match[1].trim() : title;
         };
 
         // income_detailから給与源泉関連を集計
