@@ -337,6 +337,11 @@
           <h3 id="list-title" class="font-bold flex items-center gap-2"><i class="fa-solid fa-list text-slate-400"></i>登録済み仕訳明細</h3>
           <span id="data-count" class="bg-slate-100 text-slate-600 text-[10px] font-bold px-3 py-1 rounded-full">0件</span>
         </div>
+        <div class="mb-3 flex gap-2 flex-wrap">
+          <button onclick="filterDataTable(null)" id="filter-all" class="px-3 py-1 text-xs font-bold rounded-lg bg-slate-200 text-slate-700">すべて</button>
+          <button onclick="filterDataTable('雑費')" id="filter-misc" class="px-3 py-1 text-xs font-bold rounded-lg hover:bg-rose-100 text-slate-600">🔍 雑費のみ</button>
+          <button onclick="highlightMiscExpenses()" id="btn-highlight-misc" class="px-3 py-1 text-xs font-bold rounded-lg bg-amber-100 text-amber-800">⚠️ 大きな雑費を見つける</button>
+        </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm text-left">
             <thead class="bg-slate-50 text-slate-500">
@@ -971,6 +976,7 @@
         let tax_gross = 0, tax_net = 0, tax_reconstruction = 0, tax_total = 0, tax_withholding = 0, tax_final = 0;
 
         // スプレッドシートにある「科目名」の部分・完全一致で抽出し、すべて加算する（推測計算を一切しない）
+        const debugMiscExpenses = [];
         yr.forEach(x => {
             const cleanCat = x.category.trim();
             const amt = Number(x.amount) || 0;
@@ -1005,6 +1011,7 @@
             else if (cleanCat.includes('基礎控除')) basic_val += amt;
             else if (x.type === 'expense') {
               expense_total += amt;
+              if (cleanCat === '雑費') debugMiscExpenses.push({id: x.id, date: x.date, title: x.title, amount: amt});
               if (kessanExps[cleanCat] !== undefined) {
                 kessanExps[cleanCat] += amt;
               } else if (cleanCat) {
@@ -1014,6 +1021,13 @@
               }
             }
         });
+
+        console.log('=== 雑費 DEBUG INFO ===');
+        console.log('Total 雑費 amount:', kessanExps['雑費']);
+        console.log('All 雑費 entries:', debugMiscExpenses);
+        if (debugMiscExpenses.some(e => e.amount === 2247600)) {
+          console.warn('⚠️  FOUND IT: 2,247,600 yen entry detected!', debugMiscExpenses.find(e => e.amount === 2247600));
+        }
 
         // 給与所得控除の計算（国税庁基準）
         let salary_deduction = 0;
@@ -1677,7 +1691,71 @@
         updateDropdown();
         selectManualType('salary'); 
       }
-      
+
+      let currentDataFilter = null;
+      function filterDataTable(category) {
+        currentDataFilter = category;
+        const tbody = document.getElementById('data-tbody');
+        const yr = state.records.filter(r => r.year === state.currentYear);
+
+        const updateButtons = () => {
+          document.getElementById('filter-all').className = category === null ? 'px-3 py-1 text-xs font-bold rounded-lg bg-slate-800 text-white' : 'px-3 py-1 text-xs font-bold rounded-lg bg-slate-200 text-slate-700';
+          document.getElementById('filter-misc').className = category === '雑費' ? 'px-3 py-1 text-xs font-bold rounded-lg bg-rose-500 text-white' : 'px-3 py-1 text-xs font-bold rounded-lg hover:bg-rose-100 text-slate-600';
+        };
+        updateButtons();
+
+        const filtered = category === null ? yr : yr.filter(x => x.category.trim() === category);
+        tbody.innerHTML = filtered.length ? filtered.map(x => {
+            let badgeClass = "bg-slate-100 text-slate-600";
+            let typeText = "経費";
+            if(x.type==='salary') { badgeClass = "bg-blue-50 text-blue-600"; typeText = "給与"; }
+            else if(x.type==='revenue') { badgeClass = "bg-emerald-50 text-emerald-600"; typeText = "売上"; }
+            else if(x.type==='expense') { badgeClass = "bg-rose-50 text-rose-600"; typeText = "経費"; }
+            else if(x.type==='deduction') { badgeClass = "bg-indigo-50 text-indigo-600"; typeText = "控除"; }
+            else if(x.type==='tax') { badgeClass = "bg-amber-50 text-amber-600"; typeText = "税金"; }
+
+            return `
+            <tr class="hover:bg-slate-50/50">
+            <td class="p-3 text-xs font-bold text-slate-500">${x.date}</td>
+            <td class="p-3 text-xs font-bold">
+            <span class="px-2 py-0.5 rounded-md ${badgeClass}">${typeText}</span>
+            </td>
+            <td class="p-3 text-xs font-black text-slate-700">${x.category}</td>
+            <td class="p-3 text-xs text-slate-600 max-w-[150px] truncate" title="${x.title}">${x.title}</td>
+            <td class="p-3 text-xs font-black text-right text-slate-800">¥${x.amount.toLocaleString()}</td>
+            <td class="p-3 text-center">
+            <button onclick="deleteRow(${x.id})" class="text-slate-300 hover:text-rose-500 p-1.5 active-scale touch-target"><i class="fa-solid fa-trash-can"></i></button>
+            </td>
+            </tr>`;
+        }).join('') : `
+        <tr>
+        <td colspan="6" class="p-12 text-center text-slate-400">
+        <i class="fa-regular fa-folder-open text-2xl mb-2 block"></i>
+        <p class="text-xs font-bold">該当データがありません</p>
+        </td>
+        </tr>`;
+      }
+
+      function highlightMiscExpenses() {
+        const yr = state.records.filter(r => r.year === state.currentYear);
+        const miscExps = yr.filter(x => x.type === 'expense' && x.category.trim() === '雑費');
+
+        if (miscExps.length === 0) {
+          alert('雑費のエントリがありません');
+          return;
+        }
+
+        miscExps.sort((a, b) => Number(b.amount) - Number(a.amount));
+        let msg = '雑費の内訳（大きい順）:\n\n';
+        miscExps.forEach((x, idx) => {
+          msg += `${idx + 1}. ¥${x.amount.toLocaleString()} - ${x.title || x.date}\n`;
+        });
+        msg += `\n合計: ¥${miscExps.reduce((s, x) => s + Number(x.amount), 0).toLocaleString()}`;
+
+        alert(msg);
+        filterDataTable('雑費');
+      }
+
       function deleteRow(id) {
         if (!confirm('この明細行を完全に削除しますか？')) return;
         showToast("削除中...", "load");
