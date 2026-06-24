@@ -826,6 +826,21 @@
         previewValKanji.innerText = `（およそ ${kanji}）`;
       }
       
+      // 国税庁公表の所得税の速算表（超過累進税率）。課税される所得金額㉖から算出税額㉗を計算する。
+      function calcIncomeTax(taxable) {
+        const brackets = [
+          { max: 1949000, rate: 0.05, deduct: 0 },
+          { max: 3299000, rate: 0.10, deduct: 97500 },
+          { max: 6499000, rate: 0.20, deduct: 427500 },
+          { max: 8999000, rate: 0.23, deduct: 636000 },
+          { max: 17999000, rate: 0.33, deduct: 1536000 },
+          { max: 39999000, rate: 0.40, deduct: 2796000 },
+          { max: Infinity, rate: 0.45, deduct: 4796000 }
+        ];
+        const b = brackets.find(x => taxable <= x.max);
+        return Math.max(0, Math.floor(taxable * b.rate - b.deduct));
+      }
+
       function renderDashboard() {
         const yr = state.records.filter(r => r.year === state.currentYear);
         
@@ -926,13 +941,28 @@
         // 最終課税所得金額
         document.getElementById('bB-taxable-income').innerText = final_taxable_income.toLocaleString();
 
-        // 税金の計算ブロック（抽出済みの実数値をそのまま表示。計算は一切行わない）
-        document.getElementById('bB-tax-gross').innerText = tax_gross.toLocaleString();
-        document.getElementById('bB-tax-net').innerText = tax_net.toLocaleString();
-        document.getElementById('bB-tax-reconstruction').innerText = tax_reconstruction.toLocaleString();
-        document.getElementById('bB-tax-total').innerText = tax_total.toLocaleString();
+        // 税金の計算ブロック
+        // 申告書類から「税金の計算」欄が一件も抽出できなかった場合（古いPDFで第一表下部が読み取れない等）、
+        // 所得税の速算表（国税庁公表の超過累進税率）を使って課税される所得金額㉖から逆算する。
+        // ※源泉徴収税額・申告納税額は書類に記載がなければ判定不能なため0のまま（推測しない）。
+        let taxComputed = false;
+        if (tax_gross === 0 && tax_net === 0 && tax_total === 0 && final_taxable_income > 0) {
+          tax_gross = calcIncomeTax(final_taxable_income);
+          tax_net = tax_gross;
+          tax_reconstruction = Math.floor(tax_net * 0.021);
+          tax_total = tax_net + tax_reconstruction;
+          taxComputed = true;
+        }
+        if (tax_withholding === 0 && tax_final === 0 && tax_total > 0) {
+          tax_final = tax_total - tax_withholding;
+        }
+
+        document.getElementById('bB-tax-gross').innerText = tax_gross.toLocaleString() + (taxComputed ? '（自動計算）' : '');
+        document.getElementById('bB-tax-net').innerText = tax_net.toLocaleString() + (taxComputed ? '（自動計算）' : '');
+        document.getElementById('bB-tax-reconstruction').innerText = tax_reconstruction.toLocaleString() + (taxComputed ? '（自動計算）' : '');
+        document.getElementById('bB-tax-total').innerText = tax_total.toLocaleString() + (taxComputed ? '（自動計算）' : '');
         document.getElementById('bB-tax-withholding').innerText = tax_withholding.toLocaleString();
-        document.getElementById('bB-tax-final').innerText = tax_final.toLocaleString();
+        document.getElementById('bB-tax-final').innerText = tax_final.toLocaleString() + (taxComputed ? '（参考値）' : '');
 
         // 収支内訳書側への適用
         const kessanContainer = document.getElementById('kessan-expense-tbody');
