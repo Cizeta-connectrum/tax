@@ -55,23 +55,17 @@
     <main class="max-w-7xl mx-auto px-3 sm:px-4 py-6">
     
     <div class="flex border-b border-slate-200 mb-6 bg-white p-1 rounded-2xl shadow-sm overflow-x-auto no-scrollbar gap-1">
-      <button onclick="switchTab('app')" id="tab-app" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs bg-primary-50 text-primary-600 shrink-0 touch-target active-scale">
-        <i class="fa-solid fa-file-invoice mr-1"></i>申告書・内訳書プレビュー
+      <button onclick="switchTab('dashboard')" id="tab-dashboard" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs bg-primary-50 text-primary-600 shrink-0 touch-target active-scale">
+        <i class="fa-solid fa-file-invoice mr-1"></i>年度ごとの確定申告
       </button>
-      <button onclick="switchTab('manual')" id="tab-manual" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale">
-        <i class="fa-solid fa-square-plus mr-1"></i>手動データ登録
+      <button onclick="switchTab('withholding')" id="tab-withholding" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale">
+        <i class="fa-solid fa-receipt mr-1"></i>源泉徴収票・支払調書
       </button>
-      <button onclick="switchTab('camera')" id="tab-camera" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale">
-        <i class="fa-solid fa-camera mr-1"></i>AIスキャナー & e-Tax取込
-      </button>
-      <button onclick="switchTab('import')" id="tab-import" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale">
-        <i class="fa-solid fa-file-csv mr-1"></i>経費テキスト取り込み
-      </button>
-      <button onclick="switchTab('report')" id="tab-report" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale">
-        <i class="fa-solid fa-file-invoice mr-1"></i>e-Tax転記レポート
+      <button onclick="switchTab('expense')" id="tab-expense" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale">
+        <i class="fa-solid fa-camera mr-1"></i>経費取り込み
       </button>
       <button onclick="switchTab('analysis')" id="tab-analysis" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale">
-        <i class="fa-solid fa-chart-line mr-1"></i>経年分析ダッシュボード
+        <i class="fa-solid fa-chart-line mr-1"></i>分析ダッシュボード
       </button>
     </div>
     
@@ -434,7 +428,7 @@
     </div>
     
     <div id="view-camera" class="space-y-6 hidden">
-      <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm max-w-xl mx-auto">
+      <div id="mode-selector-box" class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm max-w-xl mx-auto">
         <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2"><i class="fa-solid fa-expand text-primary-600"></i>インポート・スキャンモード選択</h3>
         <div class="grid grid-cols-2 gap-3">
           <button onclick="setScanMode('receipt')" id="btn-mode-receipt" class="py-3 px-4 border-2 border-primary-500 bg-primary-50 text-primary-600 rounded-xl font-bold text-xs active-scale">
@@ -660,17 +654,44 @@
       window.onload = () => {
         updateDropdown();
         checkEnv();
+        switchTab('dashboard');
       };
       
       function switchTab(t) {
-        ['app', 'manual', 'camera', 'import', 'report', 'analysis'].forEach(x => {
-            document.getElementById('view-'+x).classList.add('hidden');
-            document.getElementById('tab-'+x).className = "flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale";
+        // すべてのタブボタンと対応ビューをリセット
+        ['dashboard', 'withholding', 'expense', 'analysis'].forEach(x => {
+          document.getElementById('tab-'+x).className = "flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale";
         });
-        document.getElementById('view-'+t).classList.remove('hidden');
+        document.getElementById('view-app').classList.add('hidden');
+        document.getElementById('view-manual').classList.add('hidden');
+        document.getElementById('view-camera').classList.add('hidden');
+        document.getElementById('view-import').classList.add('hidden');
+        document.getElementById('view-report').classList.add('hidden');
+        document.getElementById('view-analysis').classList.add('hidden');
+
+        // 選択されたタブのボタンをハイライト
         document.getElementById('tab-'+t).className = "flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs bg-primary-50 text-primary-600 shrink-0 touch-target active-scale";
-        if (t === 'report') renderReport();
-        if (t === 'analysis') renderAnalysis();
+
+        // タブに対応する内容を表示
+        if (t === 'dashboard') {
+          document.getElementById('view-app').classList.remove('hidden');
+          document.getElementById('view-manual').classList.remove('hidden');
+          renderDashboard();
+        } else if (t === 'withholding') {
+          document.getElementById('mode-selector-box').classList.remove('hidden');
+          setScanMode('document');
+          document.getElementById('view-camera').classList.remove('hidden');
+        } else if (t === 'expense') {
+          document.getElementById('mode-selector-box').classList.add('hidden');
+          setScanMode('receipt');
+          document.getElementById('view-camera').classList.remove('hidden');
+          document.getElementById('view-import').classList.remove('hidden');
+        } else if (t === 'analysis') {
+          document.getElementById('view-report').classList.remove('hidden');
+          document.getElementById('view-analysis').classList.remove('hidden');
+          renderReport();
+          renderAnalysis();
+        }
       }
       
       function setScanMode(mode) {
@@ -1399,7 +1420,7 @@
               setTimeout(() => {
                   closeToast();
                   cancelOcr();
-                  switchTab('app');
+                  switchTab('dashboard');
                   renderDashboard();
                   renderYears();
               }, 1200);
@@ -1422,7 +1443,7 @@
               setTimeout(() => {
                   closeToast();
                   cancelOcr();
-                  switchTab('app');
+                  switchTab('dashboard');
                   renderDashboard();
                   renderYears();
               }, 1200);
@@ -1483,7 +1504,7 @@
               showToast("一括取り込みに成功しました！", "success");
               setTimeout(() => {
                   closeToast();
-                  switchTab('app'); 
+                  switchTab('dashboard'); 
                   renderDashboard();
                   renderYears();
               }, 1200);
@@ -1501,7 +1522,7 @@
           showToast("一括取り込み完了(デモ)", "success");
           setTimeout(() => {
               closeToast();
-              switchTab('app'); 
+              switchTab('dashboard'); 
               renderDashboard();
               renderYears();
           }, 1200);
@@ -1530,7 +1551,7 @@
           .withSuccessHandler(res => { 
               state.records = res; 
               closeToast();
-              switchTab('app');
+              switchTab('dashboard');
               renderDashboard(); 
               renderYears(); 
           })
@@ -1543,7 +1564,7 @@
               state.records.push({ id: state.records.length + 1, ...data });
               localStorage.setItem('shinkoku_ledger', JSON.stringify(state.records));
               closeToast();
-              switchTab('app');
+              switchTab('dashboard');
               renderDashboard(); 
               renderYears();
           }, 500);
