@@ -92,7 +92,7 @@ Markdownの装飾は一切不要です。純粋なJSON文字列のみを出力�
   "year": 申告年度の西暦（例: 平成24年分なら 2012）,
   "items": [
     {
-      "type": "revenue" | "salary" | "expense" | "deduction",
+      "type": "revenue" | "salary" | "expense" | "deduction" | "income_detail" | "tax",
       "category": "指定の勘定科目名",
       "title": "抽出した項目名",
       "amount": 数値金額（カンマを除去した整数）
@@ -135,6 +135,20 @@ Markdownの装飾は一切不要です。純粋なJSON文字列のみを出力�
 - 「申告納税額」（納める税金・還付される税金） ➔ type: "tax", category: "申告納税額", title: "申告納税額"
   - この欄の数値に「▲」「△」「－（マイナス）」などの記号が付いている場合は、還付される税金であることを示すため、amount は必ず負の数値（例: -201309）として返してください。記号が無ければ納める税金として正の数値で返してください。
 これらの「税金の計算」欄に記載がある項目だけ抽出し、記載のない項目（古い様式に存在しない項目を含む）は除外してください。
+
+■ 確定申告書B（第二表）の「所得の内訳（源泉徴収税額）」テーブルから：
+- 表内の各行（給与（会社名）、業務委託など）について、以下を抽出してください：
+  - 種別・摘要 ➔ 企業名や「給与」「業務委託」などを title に含める
+  - 収入金額 ➔ type: "income_detail", category: "給与" | "業務委託" | "その他"
+  - 源泉徴収税額 ➔ type: "income_detail", category: "給与源泉" | "業務委託源泉" など
+
+■ 確定申告書B（第二表）の「雑所得（公的年金等以外）、総合課税の配当所得・譲渡所得」セクションから：
+- 「雑所得」の行に「収入金額」「必要経費等」「差引金額」が記載されていれば：
+  - 収入金額 ➔ type: "income_detail", category: "雑所得", title: "雑所得収入"
+  - 必要経費等 ➔ type: "income_detail", category: "雑所得", title: "雑所得経費"
+  - 差引金額 ➔ type: "income_detail", category: "雑所得", title: "雑所得"
+- 「配当所得」が記載されていれば ➔ type: "income_detail", category: "配当所得"
+- 「譲渡所得」が記載されていれば ➔ type: "income_detail", category: "譲渡所得"
 
 【厳重注意】
 - 「収入金額（ア、カなど）」と「所得金額（①、⑥など）」を絶対に混同しないでください。
@@ -388,6 +402,7 @@ function addBulkData(items) {
     else if (item.type === "deduction") typeJp = "控除";
     else if (item.type === "salary") typeJp = "給与";
     else if (item.type === "tax") typeJp = "税金";
+    else if (item.type === "income_detail") typeJp = "所得内訳";
 
     let formattedDate = item.date;
     try { formattedDate = new Date(item.date); } catch(e) {}
