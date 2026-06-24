@@ -964,7 +964,17 @@
         document.getElementById('bB-tax-reconstruction').innerText = tax_reconstruction.toLocaleString() + (taxComputed ? '（自動計算）' : '');
         document.getElementById('bB-tax-total').innerText = tax_total.toLocaleString() + (taxComputed ? '（自動計算）' : '');
         document.getElementById('bB-tax-withholding').innerText = tax_withholding.toLocaleString();
-        document.getElementById('bB-tax-final').innerText = tax_final.toLocaleString() + (taxComputed ? '（参考値）' : '');
+
+        // 申告納税額：マイナスは還付金額として表示
+        let finalDisplay = '';
+        if (tax_final < 0) {
+          finalDisplay = `還付金額 ¥${Math.abs(tax_final).toLocaleString()}`;
+        } else if (tax_final > 0) {
+          finalDisplay = `納税額 ¥${tax_final.toLocaleString()}`;
+        } else {
+          finalDisplay = '申告納税額 ¥0';
+        }
+        document.getElementById('bB-tax-final').innerText = finalDisplay + (taxComputed ? '（参考値）' : '');
 
         // 収支内訳書側への適用
         const kessanContainer = document.getElementById('kessan-expense-tbody');
