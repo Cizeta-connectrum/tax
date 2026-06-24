@@ -1200,18 +1200,77 @@
         document.getElementById('withholding-total-tax').innerText = withholdingTotalTax > 0 ? withholdingTotalTax.toLocaleString() : '0';
         document.getElementById('withholding-year-title').innerText = getWareki(state.currentYear) + '年分';
 
-        // 収支内訳書側への適用
+        // 収支内訳書側への適用（3段階構造：事業収入 → 経費 → 所得）
         const kessanContainer = document.getElementById('kessan-expense-tbody');
-        kessanContainer.innerHTML = Object.entries(kessanExps).map(([k, v]) => `
+
+        // Part 1: 事業の収入（事業収入アのみ）
+        const businessRevenueHtml = `
+          <div class="grid grid-cols-12 tax-row bg-emerald-50/30 font-bold">
+            <div class="col-span-8 tax-label p-2.5 border-r border-slate-300 flex items-center bg-emerald-100/50">
+              <span class="text-slate-700">【事業の収入】</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-700 bg-emerald-50/50"></div>
+          </div>
           <div class="grid grid-cols-12 tax-row">
-          <div class="col-span-6 tax-label p-2.5 border-r border-slate-300 flex items-center">
-          <span>${k}</span>
+            <div class="col-span-8 tax-label p-2.5 border-r border-slate-300 flex items-center">
+              <span>売上・事業収入（ア）</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-700 font-bold bg-white">
+              ${target_jigyo_shunyu > 0 ? target_jigyo_shunyu.toLocaleString() : '0'}
+            </div>
           </div>
-          <div class="col-span-6 tax-value p-2.5 flex items-center justify-end text-slate-700 font-bold bg-white">
-          ${v > 0 ? v.toLocaleString() : '0'}
-          </div>
+        `;
+
+        // Part 2: 必要経費の内訳
+        const expenseHtml = Object.entries(kessanExps).map(([k, v]) => `
+          <div class="grid grid-cols-12 tax-row">
+            <div class="col-span-8 tax-label p-2.5 border-r border-slate-300 flex items-center">
+              <span>${k}</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-700 font-bold bg-white">
+              ${v > 0 ? v.toLocaleString() : '0'}
+            </div>
           </div>
         `).join('');
+
+        const expenseSectionHtml = `
+          <div class="grid grid-cols-12 tax-row bg-rose-50/30 font-bold">
+            <div class="col-span-8 tax-label p-2.5 border-r border-slate-300 flex items-center bg-rose-100/50">
+              <span class="text-slate-700">【必要経費の内訳】</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-700 bg-rose-50/50"></div>
+          </div>
+          ${expenseHtml}
+          <div class="grid grid-cols-12 tax-row font-bold border-t-2 border-slate-400">
+            <div class="col-span-8 tax-label p-2.5 border-r border-slate-300 flex items-center bg-slate-100">
+              <span>必要経費合計</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-700 font-bold bg-slate-50">
+              ${expense_total > 0 ? expense_total.toLocaleString() : '0'}
+            </div>
+          </div>
+        `;
+
+        // Part 3: 事業所得（自動計算）
+        const businessIncome = Math.max(0, target_jigyo_shunyu - expense_total);
+        const incomeHtml = `
+          <div class="grid grid-cols-12 tax-row bg-blue-50/30 font-bold">
+            <div class="col-span-8 tax-label p-2.5 border-r border-slate-300 flex items-center bg-blue-100/50">
+              <span class="text-slate-700">【事業所得】</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-700 bg-blue-50/50"></div>
+          </div>
+          <div class="grid grid-cols-12 tax-row font-bold bg-blue-50/50 border-t-2 border-blue-300">
+            <div class="col-span-8 tax-label p-2.5 border-r border-slate-300 flex items-center">
+              <span>事業所得①（自動計算）</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-blue-700 font-bold">
+              ${businessIncome.toLocaleString()}
+            </div>
+          </div>
+        `;
+
+        kessanContainer.innerHTML = businessRevenueHtml + expenseSectionHtml + incomeHtml;
         document.getElementById('kessan-total-expense').innerText = expense_total > 0 ? expense_total.toLocaleString() : '0';
         
         document.getElementById('data-count').innerText = `${yr.length}件`;
