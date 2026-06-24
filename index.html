@@ -267,7 +267,38 @@
           </div>
         </div>
       </div>
-      
+
+      <div id="tax-withholding-container" class="max-w-3xl mx-auto bg-white rounded-3xl p-4 sm:p-6 shadow-xl border border-slate-200">
+        <div class="text-center mb-6">
+          <span id="withholding-year-title" class="text-sm font-black text-slate-500 tracking-wider">平成XX年分</span>
+          <h2 class="text-xl sm:text-2xl font-black text-slate-800 tracking-tight mt-1">所得の内訳（源泉徴収税額）</h2>
+          <p class="text-[10px] text-slate-400 mt-1">※各収入源ごとの金額と源泉徴収税額です。</p>
+        </div>
+
+        <div class="tax-sheet rounded-2xl overflow-hidden shadow-sm border-2 border-slate-800 text-xs">
+          <div class="grid grid-cols-12 tax-header font-black text-center text-slate-700 border-b border-slate-800 py-1.5">
+            <div class="col-span-4 border-r border-slate-400">種別・摘要</div>
+            <div class="col-span-4 border-r border-slate-400">収入金額</div>
+            <div class="col-span-4">源泉徴収税額</div>
+          </div>
+
+          <div id="withholding-tbody" class="divide-y divide-slate-300">
+          </div>
+
+          <div class="grid grid-cols-12 tax-row bg-slate-100 font-black">
+            <div class="col-span-4 tax-label p-2.5 bg-slate-200 border-r border-slate-300 flex items-center">
+              <span>合計</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end border-r border-slate-300 text-slate-900" id="withholding-total-income">
+              0
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-900" id="withholding-total-tax">
+              0
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div id="tax-kessan-container" class="max-w-3xl mx-auto bg-white rounded-3xl p-4 sm:p-6 shadow-xl border border-slate-200 hidden">
         <div class="text-center mb-6">
           <span id="kessan-year-title" class="text-sm font-black text-slate-500 tracking-wider">平成XX年分</span>
@@ -981,6 +1012,58 @@
           finalDisplay = '申告納税額 ¥0';
         }
         document.getElementById('bB-tax-final').innerText = finalDisplay + (taxComputed ? '（参考値）' : '');
+
+        // 源泉徴収票セクション
+        const withholdingRows = yr.filter(x => x.type === 'salary' || (x.type === 'revenue' && x.category.includes('給与')));
+        const withholdingMap = {};
+        let withholdingTotalIncome = 0, withholdingTotalTax = 0;
+
+        yr.forEach(x => {
+          const cleanCat = x.category.trim();
+          const amt = Number(x.amount) || 0;
+
+          if (x.type === 'salary' || (x.type === 'revenue' && cleanCat.includes('給与'))) {
+            const key = x.title || cleanCat;
+            if (!withholdingMap[key]) withholdingMap[key] = { income: 0, withholding: 0 };
+            withholdingMap[key].income += amt;
+            withholdingTotalIncome += amt;
+          }
+        });
+
+        yr.forEach(x => {
+          const cleanCat = x.category.trim();
+          const amt = Number(x.amount) || 0;
+
+          if (x.type === 'tax' && cleanCat === '源泉徴収税額') {
+            const title = x.title || '給与源泉徴収';
+            const key = title.replace('源泉徴収', '').trim() || '給与';
+            if (withholdingMap[key]) {
+              withholdingMap[key].withholding += amt;
+            } else {
+              withholdingMap[key] = { income: 0, withholding: amt };
+            }
+            withholdingTotalTax += amt;
+          }
+        });
+
+        const withholdingTbody = document.getElementById('withholding-tbody');
+        withholdingTbody.innerHTML = Object.entries(withholdingMap).map(([k, v]) => `
+          <div class="grid grid-cols-12 tax-row">
+            <div class="col-span-4 tax-label p-2.5 border-r border-slate-300 flex items-center text-slate-700">
+              <span>${k}</span>
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end border-r border-slate-300 text-slate-700">
+              ${v.income > 0 ? v.income.toLocaleString() : '0'}
+            </div>
+            <div class="col-span-4 tax-value p-2.5 flex items-center justify-end text-slate-700">
+              ${v.withholding > 0 ? v.withholding.toLocaleString() : '0'}
+            </div>
+          </div>
+        `).join('');
+
+        document.getElementById('withholding-total-income').innerText = withholdingTotalIncome > 0 ? withholdingTotalIncome.toLocaleString() : '0';
+        document.getElementById('withholding-total-tax').innerText = withholdingTotalTax > 0 ? withholdingTotalTax.toLocaleString() : '0';
+        document.getElementById('withholding-year-title').innerText = getWareki(state.currentYear) + '年分';
 
         // 収支内訳書側への適用
         const kessanContainer = document.getElementById('kessan-expense-tbody');
