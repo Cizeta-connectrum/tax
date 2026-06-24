@@ -1770,16 +1770,43 @@
         msg += `\n合計: ¥${miscExps.reduce((s, x) => s + Number(x.amount), 0).toLocaleString()}`;
 
         if (suspiciousItems.length > 0) {
-          msg += `\n\n⚠️ 警告: 以下の行は合計行または不正な行のように見えます（削除推奨）:\n`;
+          msg += `\n\n⚠️ 警告: 以下の行は合計行または重複計上エントリのように見えます:\n`;
           suspiciousItems.forEach(id => {
             const item = miscExps.find(x => x.id === id);
             msg += `  ID ${id}: ¥${item.amount.toLocaleString()} (${item.title})\n`;
           });
-          msg += '\n下の表から削除ボタンをクリックして削除してください。';
-        }
+          msg += '\n\n【自動削除を実行しますか？】\nこれらの合計行エントリを自動検出・削除します。';
 
-        alert(msg);
-        filterDataTable('雑費');
+          if (confirm(msg)) {
+            cleanupDuplicateExpenses();
+          }
+        } else {
+          alert(msg);
+        }
+      }
+
+      function cleanupDuplicateExpenses() {
+        showToast("重複経費を削除中...", "load");
+
+        if (typeof google !== 'undefined' && google.script) {
+          google.script.run
+          .withSuccessHandler(result => {
+              console.log('クリーンアップ結果:', result);
+              google.script.run.withSuccessHandler(res => {
+                  state.records = res;
+                  closeToast();
+                  showToast(result.message, "success");
+                  setTimeout(() => {
+                    closeToast();
+                    renderDashboard();
+                  }, 1500);
+              }).getData();
+          })
+          .withFailureHandler(err => {
+              showToast("削除失敗: " + err, "error");
+          })
+          .cleanupDuplicateExpenseEntries();
+        }
       }
 
       function deleteRow(id) {

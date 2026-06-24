@@ -467,3 +467,55 @@ function deleteData(rowIndex) {
   sheet.deleteRow(rowIndex);
   return getData();
 }
+
+/**
+ * 「必要経費合計」や「合計」という名前のエントリを自動削除（重複計上防止）
+ */
+function cleanupDuplicateExpenseEntries() {
+  const sheet = initSheet();
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+
+  if (lastRow <= 1) return { deleted: 0, message: "削除対象がありません" };
+
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  let titleCol = 2;
+  let typeCol = 5;
+
+  headers.forEach((h, idx) => {
+    const cleanH = h.toString().trim();
+    if (cleanH === "内容・店名" || cleanH === "店名") titleCol = idx + 1;
+    if (cleanH === "区分") typeCol = idx + 1;
+  });
+
+  const values = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  const rowsToDelete = [];
+
+  values.forEach((row, index) => {
+    const title = (row[titleCol - 1] || "").toString().trim();
+    const type = (row[typeCol - 1] || "").toString().trim();
+
+    // 「必要経費合計」「経費計」など合計行を検出して削除対象にする
+    if (type === "経費" && (
+      title.includes("必要経費合計") ||
+      title.includes("経費計") ||
+      title.includes("差引金額") ||
+      (title.includes("必要経費") && title.includes("計"))
+    )) {
+      rowsToDelete.push(index + 2); // スプレッドシートの行番号は1ベース
+    }
+  });
+
+  // 逆順でソート（下から削除していく）
+  rowsToDelete.sort((a, b) => b - a);
+
+  rowsToDelete.forEach(rowNum => {
+    sheet.deleteRow(rowNum);
+  });
+
+  return {
+    deleted: rowsToDelete.length,
+    message: `${rowsToDelete.length}件の重複経費エントリを削除しました`,
+    deletedRows: rowsToDelete
+  };
+}
