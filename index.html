@@ -1022,10 +1022,19 @@
         const withholdingMap = {};
         let withholdingTotalIncome = 0, withholdingTotalTax = 0;
 
-        // titleから会社名を抽出（「給与（会社名）」または「給与(会社名)」→「会社名」、全角・半角括弧両対応）
+        // titleから会社名を抽出
+        // 括弧形式：「給与（会社名）」「給与(会社名)」
+        // スペース形式：「給与 会社名」「源泉徴収税額 会社名」
         const extractCompanyName = (title) => {
-          const match = title.match(/[（(](.+)[）)]/);
-          return match ? match[1].trim() : title;
+          // 括弧形式から抽出
+          const bracketMatch = title.match(/[（(](.+)[）)]/);
+          if (bracketMatch) return bracketMatch[1].trim();
+
+          // スペース形式から抽出（最初の単語を削除して残りを会社名）
+          const parts = title.split(/\s+/);
+          if (parts.length > 1) return parts.slice(1).join(' ').trim();
+
+          return title;
         };
 
         // income_detailから給与源泉関連を集計
