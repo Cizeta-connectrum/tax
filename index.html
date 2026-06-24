@@ -1649,18 +1649,34 @@
           options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
         });
 
+        // 申告納税額は符号を反転して表示：還付はプラス（緑）、納付はマイナス（赤）
+        const taxFinalDisplayArr = taxFinalArr.map(v => -v);
+
         analysisCharts.taxPayment = new Chart(document.getElementById('chart-tax-payment'), {
           type: 'bar',
           data: {
             labels,
             datasets: [
               { label: '源泉徴収税額', data: taxWithholdingArr, backgroundColor: '#0ea5e9' },
-              { label: '申告納税額', data: taxFinalArr, backgroundColor: (ctx) => taxFinalArr[ctx.dataIndex] >= 0 ? '#dc2626' : '#10b981' }
+              { label: '還付(+)/納付(-)額', data: taxFinalDisplayArr, backgroundColor: (ctx) => taxFinalDisplayArr[ctx.dataIndex] >= 0 ? '#10b981' : '#dc2626' }
             ]
           },
           options: {
             responsive: true,
-            plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } },
+            plugins: {
+              legend: { position: 'bottom', labels: { font: { size: 10 } } },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => {
+                    if (ctx.dataset.label === '還付(+)/納付(-)額') {
+                      const v = ctx.raw;
+                      return (v >= 0 ? '還付 ¥' : '納付 ¥') + Math.abs(v).toLocaleString();
+                    }
+                    return ctx.dataset.label + ': ¥' + ctx.raw.toLocaleString();
+                  }
+                }
+              }
+            },
             scales: { y: { beginAtZero: true } }
           }
         });
