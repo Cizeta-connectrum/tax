@@ -387,7 +387,8 @@ function addBulkData(items) {
     if (item.type === "revenue") typeJp = "売上";
     else if (item.type === "deduction") typeJp = "控除";
     else if (item.type === "salary") typeJp = "給与";
-    
+    else if (item.type === "tax") typeJp = "税金";
+
     let formattedDate = item.date;
     try { formattedDate = new Date(item.date); } catch(e) {}
 
