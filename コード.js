@@ -84,7 +84,7 @@ function analyzeTaxDocument(base64Data, mimeType) {
   const availableModels = getAvailableModels(cleanApiKey);
   const priorityModels = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
 
-  const prompt = `あなたはプロのデータ入力オペレーターです。添付された日本の「確定申告書B（第一表）」および「収支内訳書」の画像を解析し、記載されている金額を一切の推測や計算を行わずに、そのまま抽出してJSON形式で返してください。
+  const prompt = `あなたはプロのデータ入力オペレーターです。添付された日本の確定申告書類（「確定申告書B（第一表・第二表）」「収支内訳書」のいずれか、または複数）を解析し、記載されている金額を一切の推測や計算を行わずに、そのまま抽出してJSON形式で返してください。
 Markdownの装飾は一切不要です。純粋なJSON文字列のみを出力してください。
 
 【出力JSONフォーマット】
@@ -117,12 +117,49 @@ Markdownの装飾は一切不要です。純粋なJSON文字列のみを出力�
 ■ 収支内訳書の「経費」ブロックから：
 - 給料賃金、減価償却費、旅費交通費、消耗品費 などの経費金額 ➔ type: "expense", category: "そのままの経費科目名"
 
+■ 第一表の数字グリッドだけで「事業（営業等）ア」「①」が0または空白に見える場合、必ず確定申告書B「第二表」の「所得の内訳」または「雑所得（業務）に関する事項」の表も確認してください。
+- 「業務」「雑所得」などの行に「収入金額」「必要経費等」「差引金額」が記載されていれば：
+  - 収入金額 ➔ type: "revenue", category: "売上・事業収入"
+  - 差引金額（所得金額） ➔ type: "revenue", category: "事業所得"
+  - 必要経費等 ➔ type: "expense", category: "雑費", title: "必要経費合計（第二表より）"
+  この第二表の数値は、第一表の数字グリッドより読み取りやすい場合が多いため、両方を必ず確認し、実際に印字されている数値を採用してください。
+
 【厳重注意】
 - 「収入金額（ア、カなど）」と「所得金額（①、⑥など）」を絶対に混同しないでください。
 - 減価償却費などの経費の数値を、誤って給与収入（カ）などに分類しないでください。
 - 計算は一切行わず、画像・PDFにある数値を「そのまま」抽出してください。存在しない項目は推測で0を入れず、itemsから除外してください。`;
 
-  return callGemini(cleanApiKey, availableModels, priorityModels, base64Data, prompt, actualMimeType);
+  const result = callGemini(cleanApiKey, availableModels, priorityModels, base64Data, prompt, actualMimeType);
+  return reconcileBusinessExpense(result);
+}
+
+/**
+ * 収支内訳書が添付されておらず経費の内訳が一件も抽出されなかった場合、
+ * 「事業所得＝事業収入－必要経費」という確定した会計上の等式から
+ * 必要経費合計を逆算する（推測ではなく、抽出済みの実数値による引き算）
+ */
+function reconcileBusinessExpense(docResult) {
+  if (!docResult || !docResult.items || !docResult.items.length) return docResult;
+
+  const items = docResult.items;
+  const sum = (pred) => items.filter(pred).reduce((s, i) => s + (Number(i.amount) || 0), 0);
+
+  const businessRevenue = sum(i => i.type === 'revenue' && i.category === '売上・事業収入');
+  const businessIncome = sum(i => i.type === 'revenue' && i.category === '事業所得');
+  const existingExpense = sum(i => i.type === 'expense');
+
+  if (businessRevenue > 0 && businessIncome >= 0 && existingExpense === 0) {
+    const computedExpense = businessRevenue - businessIncome;
+    if (computedExpense > 0) {
+      items.push({
+        type: 'expense',
+        category: '雑費',
+        title: '必要経費合計（収入－所得から計算）',
+        amount: computedExpense
+      });
+    }
+  }
+  return docResult;
 }
 
 function extractJson(text) {
