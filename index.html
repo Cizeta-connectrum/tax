@@ -441,7 +441,7 @@
             <i class="fa-solid fa-receipt mr-1"></i>領収書・レシート
           </button>
           <button onclick="setScanMode('document')" id="btn-mode-document" class="py-3 px-4 border-2 border-transparent bg-slate-100 text-slate-600 rounded-xl font-bold text-xs active-scale">
-            <i class="fa-solid fa-file-pdf mr-1"></i>申告書類 (PDF/画像/.data)
+            <i class="fa-solid fa-file-pdf mr-1"></i>申告書類・支払調書 (PDF/画像)
           </button>
         </div>
       </div>
@@ -693,9 +693,9 @@
           btnReceipt.className = "py-3 px-4 border-2 border-transparent bg-slate-100 text-slate-600 rounded-xl font-bold text-xs active-scale";
           btnDoc.className = "py-3 px-4 border-2 border-primary-500 bg-primary-50 text-primary-600 rounded-xl font-bold text-xs active-scale";
           iconMain.className = "fa-solid fa-file-pdf text-4xl text-rose-500";
-          title.innerText = "申告書・内訳書 PDF/画像/e-Taxデータ 解析";
-          desc.innerText = "確定申告書Bや収支内訳書のPDF・スキャン画像、またはe-Tax保存ファイル（.data形式等）を直接アップロードしてください。Geminiが一括で「給与、売上、各種経費、各種所得控除」を丸ごと見取ってデータ化します。";
-          btnText.innerText = "申告データ(PDF/画像/.data)を選択";
+          title.innerText = "申告書・内訳書・支払調書 解析";
+          desc.innerText = "確定申告書Bや収支内訳書、業務委託・原稿料等の「支払調書」のPDF・スキャン画像を直接アップロードしてください。Geminiが一括で「給与、売上、各種経費、各種所得控除、支払調書の支払金額・源泉徴収税額」を会社別に見取ってデータ化します。";
+          btnText.innerText = "申告データ・支払調書(PDF/画像)を選択";
         }
         cancelOcr();
       }
