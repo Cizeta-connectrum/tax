@@ -1944,7 +1944,7 @@
         yr.forEach(x => {
             if (x.type === 'salary') {
               s_raw += x.amount;
-            } else {
+            } else if (ag[x.type]) {
               const t = x.type;
               ag[t][x.category] = (ag[t][x.category] || 0) + x.amount;
               if (t === 'revenue') rtot += x.amount;
