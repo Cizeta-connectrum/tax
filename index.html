@@ -592,7 +592,7 @@
             <canvas id="chart-expense-ratio" height="220"></canvas>
           </div>
           <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-            <h3 class="font-bold text-sm text-slate-700 mb-3"><i class="fa-solid fa-money-check text-green-600 mr-1"></i>納付/還付額の推移（源泉徴収税額 vs 申告納税額）</h3>
+            <h3 class="font-bold text-sm text-slate-700 mb-3"><i class="fa-solid fa-money-check text-green-600 mr-1"></i>申告納税額の推移（還付+/納付-）</h3>
             <canvas id="chart-tax-payment" height="220"></canvas>
           </div>
           <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
@@ -1755,7 +1755,6 @@
           data: {
             labels,
             datasets: [
-              { label: '源泉徴収税額', data: taxWithholdingArr, backgroundColor: '#0ea5e9' },
               { label: '還付(+)/納付(-)額', data: taxFinalDisplayArr, backgroundColor: (ctx) => taxFinalDisplayArr[ctx.dataIndex] >= 0 ? '#10b981' : '#dc2626' }
             ]
           },
@@ -1766,11 +1765,8 @@
               tooltip: {
                 callbacks: {
                   label: (ctx) => {
-                    if (ctx.dataset.label === '還付(+)/納付(-)額') {
-                      const v = ctx.raw;
-                      return (v >= 0 ? '還付 ¥' : '納付 ¥') + Math.abs(v).toLocaleString();
-                    }
-                    return ctx.dataset.label + ': ¥' + ctx.raw.toLocaleString();
+                    const v = ctx.raw;
+                    return (v >= 0 ? '還付 ¥' : '納付 ¥') + Math.abs(v).toLocaleString();
                   }
                 }
               }
