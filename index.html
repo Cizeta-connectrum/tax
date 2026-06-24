@@ -1519,19 +1519,36 @@
               console.log(`行${idx + 1}は要素数が少ないためスキップ:`, parts);
               return;
             }
-            const d = parts[0].trim();
-            const amt = parseInt(parts[3].replace(/[^0-9]/g, ''));
-            if (!isNaN(amt)) {
+
+            // 形式判定：タブ区切りで6要素（日付|店舗|金額|科目|内容|タイムスタンプ）か、
+            // カンマ区切りで4要素（日付,科目,内容,金額）かを判定
+            let date, category, title, amount;
+
+            if (parts.length >= 6 && line.includes('\t')) {
+              // タブ区切り形式（金額が数字で認識できる場合）
+              date = parts[0].trim();
+              amount = parseInt(parts[2].replace(/[^0-9]/g, ''));
+              category = parts[3].trim();
+              title = parts[4].trim();
+            } else {
+              // カンマ区切り形式
+              date = parts[0].trim();
+              category = parts[1].trim();
+              title = parts[2].trim();
+              amount = parseInt(parts[3].replace(/[^0-9]/g, ''));
+            }
+
+            if (!isNaN(amount) && amount > 0) {
               parsed.push({
-                  year: new Date(d).getFullYear(),
-                  date: d,
-                  category: parts[1].trim(),
-                  title: parts[2].trim(),
-                  amount: amt,
+                  year: new Date(date).getFullYear(),
+                  date: date,
+                  category: category,
+                  title: title,
+                  amount: amount,
                   type: 'expense'
               });
             } else {
-              console.log(`行${idx + 1}の金額がパースできません:`, parts[3]);
+              console.log(`行${idx + 1}の金額がパースできません:`, parts);
             }
         });
 
@@ -1550,7 +1567,7 @@
           `).join('');
           document.getElementById('import-preview-box').scrollIntoView({ behavior: 'smooth' });
         } else {
-          alert('解析できるデータがありません。形式を確認してください。\n\n期待形式:\n日付,科目,内容,金額\n例: 2024-01-10,通信費,プロバイダ代,5500');
+          alert('解析できるデータがありません。形式を確認してください。\n\n対応形式:\n【カンマ区切り】日付,科目,内容,金額\n【タブ区切り】日付\t店舗名\t金額\t科目\t内容\t(タイムスタンプ)\n\n例:\n2024-01-10,通信費,プロバイダ代,5500\nまたは\n2024-01-10\tドコモ\t5500\t通信費\tプロバイダ代');
         }
       }
       
