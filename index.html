@@ -58,11 +58,11 @@
       <button onclick="switchTab('dashboard')" id="tab-dashboard" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs bg-primary-50 text-primary-600 shrink-0 touch-target active-scale">
         <i class="fa-solid fa-file-invoice mr-1"></i>年度ごとの確定申告
       </button>
-      <button onclick="switchTab('withholding')" id="tab-withholding" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale">
-        <i class="fa-solid fa-receipt mr-1"></i>源泉徴収票・支払調書
+      <button onclick="switchTab('b-sheet')" id="tab-b-sheet" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale">
+        <i class="fa-solid fa-pen-to-square mr-1"></i>B表入力・修正
       </button>
-      <button onclick="switchTab('expense')" id="tab-expense" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale">
-        <i class="fa-solid fa-camera mr-1"></i>経費取り込み
+      <button onclick="switchTab('kessan')" id="tab-kessan" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale">
+        <i class="fa-solid fa-camera mr-1"></i>収支内訳書・経費
       </button>
       <button onclick="switchTab('analysis')" id="tab-analysis" class="flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale">
         <i class="fa-solid fa-chart-line mr-1"></i>分析ダッシュボード
@@ -686,7 +686,7 @@
       
       function switchTab(t) {
         // すべてのタブボタンと対応ビューをリセット
-        ['dashboard', 'withholding', 'expense', 'analysis'].forEach(x => {
+        ['dashboard', 'b-sheet', 'kessan', 'analysis'].forEach(x => {
           document.getElementById('tab-'+x).className = "flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs text-slate-500 shrink-0 touch-target active-scale";
         });
         document.getElementById('view-app').classList.add('hidden');
@@ -695,6 +695,7 @@
         document.getElementById('view-import').classList.add('hidden');
         document.getElementById('view-report').classList.add('hidden');
         document.getElementById('view-analysis').classList.add('hidden');
+        document.getElementById('tax-kessan-container').classList.add('hidden');
 
         // 選択されたタブのボタンをハイライト
         document.getElementById('tab-'+t).className = "flex-1 py-3 px-4 text-center rounded-xl font-bold text-xs bg-primary-50 text-primary-600 shrink-0 touch-target active-scale";
@@ -702,19 +703,21 @@
         // タブに対応する内容を表示
         if (t === 'dashboard') {
           document.getElementById('view-app').classList.remove('hidden');
-          document.getElementById('view-manual').classList.remove('hidden');
           renderDashboard();
-        } else if (t === 'withholding') {
+        } else if (t === 'b-sheet') {
           document.getElementById('mode-selector-box').classList.add('hidden');
           document.getElementById('income-category-box').classList.remove('hidden');
           setScanMode('document');
+          document.getElementById('view-manual').classList.remove('hidden');
           document.getElementById('view-camera').classList.remove('hidden');
-        } else if (t === 'expense') {
+        } else if (t === 'kessan') {
           document.getElementById('mode-selector-box').classList.add('hidden');
           document.getElementById('income-category-box').classList.add('hidden');
           setScanMode('receipt');
           document.getElementById('view-camera').classList.remove('hidden');
           document.getElementById('view-import').classList.remove('hidden');
+          document.getElementById('tax-kessan-container').classList.remove('hidden');
+          renderDashboard();
         } else if (t === 'analysis') {
           document.getElementById('view-report').classList.remove('hidden');
           document.getElementById('view-analysis').classList.remove('hidden');
