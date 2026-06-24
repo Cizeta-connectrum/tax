@@ -931,6 +931,53 @@
         previewValKanji.innerText = `（およそ ${kanji}）`;
       }
       
+      // 基礎控除（国税庁公表）。年度・合計所得金額により金額が異なるため、年度ごとのルールに従って自動計算する。
+      // ・～令和1年分（2019年分）以前：所得制限なし、一律38万円
+      // ・令和2年分～令和6年分（2020～2024年分）：合計所得金額に応じた4段階（48万/32万/16万/0円）
+      // ・令和7年分以降（2025年分～）：2025年度税制改正により、より細かい段階制に変更
+      //   （令和7年・8年分は変更前との差額分が時限的に上乗せされ、所得132万円以下は95万円）
+      function getBasicDeduction(year, totalIncome) {
+        const income = Number(totalIncome) || 0;
+
+        if (year <= 2019) {
+          // 平成・令和1年分以前：所得制限なしの一律38万円
+          return 380000;
+        }
+
+        if (year >= 2020 && year <= 2024) {
+          // 令和2年分～令和6年分：合計所得金額に応じた段階制
+          if (income <= 24000000) return 480000;
+          if (income <= 24500000) return 320000;
+          if (income <= 25000000) return 160000;
+          return 0;
+        }
+
+        // 令和7年分（2025年分）以降：2025年度税制改正による新しい段階制
+        if (year === 2025 || year === 2026) {
+          // 令和7年・8年分のみの時限的措置（高めの控除額）
+          if (income <= 1320000) return 950000;
+          if (income <= 3360000) return 880000;
+          if (income <= 4890000) return 680000;
+          if (income <= 6550000) return 630000;
+          if (income <= 23500000) return 580000;
+          if (income <= 24500000) return 480000;
+          if (income <= 25000000) return 320000;
+          return 0;
+        }
+
+        // 令和9年分（2027年分）以降：時限的な高額控除（95万円等）は終了予定だが、
+        // 本アプリ実装時点では恒久制度の確定情報が乏しいため、令和7・8年分と同じ表を暫定適用する。
+        // ※この年度分を申告する際は、必ず国税庁の最新発表で基礎控除額を確認してください。
+        if (income <= 1320000) return 950000;
+        if (income <= 3360000) return 880000;
+        if (income <= 4890000) return 680000;
+        if (income <= 6550000) return 630000;
+        if (income <= 23500000) return 580000;
+        if (income <= 24500000) return 480000;
+        if (income <= 25000000) return 320000;
+        return 0;
+      }
+
       // 国税庁公表の所得税の速算表（超過累進税率）。課税される所得金額㉖から算出税額㉗を計算する。
       function calcIncomeTax(taxable) {
         const brackets = [
@@ -1054,7 +1101,14 @@
 
         // 総合所得金額の合計 ⑨ （抽出された「給与所得」＋「事業所得」をそのまま合算）
         const total_income = target_salary_shotoku + target_jigyo_shotoku + target_misc_shunyu;
-        
+
+        // 基礎控除㉔を自動計算（PDFから抽出されていなければ、年度と合計所得金額に応じて自動算出）
+        let basicComputed = false;
+        if (basic_val === 0) {
+          basic_val = getBasicDeduction(state.currentYear, total_income);
+          basicComputed = true;
+        }
+
         // 所得控除合計 ㉕
         const total_deductions = shaho_val + shokibo_val + life_val + spouse_val + basic_val;
         
@@ -1089,7 +1143,7 @@
         document.getElementById('bB-ded-shokibo').innerText = shokibo_val > 0 ? shokibo_val.toLocaleString() : '0';
         document.getElementById('bB-ded-life').innerText = life_val > 0 ? life_val.toLocaleString() : '0';
         document.getElementById('bB-ded-spouse').innerText = spouse_val > 0 ? spouse_val.toLocaleString() : '0';
-        document.getElementById('bB-ded-basic').innerText = basic_val > 0 ? basic_val.toLocaleString() : '0';
+        document.getElementById('bB-ded-basic').innerText = (basic_val > 0 ? basic_val.toLocaleString() : '0') + (basicComputed ? '（自動計算）' : '');
         document.getElementById('bB-total-deductions').innerText = total_deductions > 0 ? total_deductions.toLocaleString() : '0';
         
         // 最終課税所得金額
