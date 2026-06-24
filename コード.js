@@ -356,6 +356,7 @@ function getData() {
       else if (rawType === "控除" || rawType === "deduction") type = "deduction";
       else if (rawType === "給与" || rawType === "salary") type = "salary";
       else if (rawType === "税金" || rawType === "tax") type = "tax";
+      else if (rawType === "所得内訳" || rawType === "income_detail") type = "income_detail";
 
       return {
         id: index + 2,
