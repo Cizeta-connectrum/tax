@@ -935,6 +935,8 @@
               expense_total += amt;
               if (kessanExps[cleanCat] !== undefined) {
                 kessanExps[cleanCat] += amt;
+              } else if (cleanCat) {
+                kessanExps[cleanCat] = (kessanExps[cleanCat] || 0) + amt;
               } else {
                 kessanExps['雑費'] += amt;
               }
