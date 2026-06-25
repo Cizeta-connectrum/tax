@@ -805,11 +805,15 @@
         if (typeof google !== 'undefined' && google.script) {
           document.getElementById('connection-status').innerText = "スプレッドシート接続";
           document.getElementById('connection-status').className = "bg-emerald-950 border border-emerald-500/30 px-3 py-1.5 rounded-full text-[10px] font-black tracking-wider text-emerald-400 uppercase";
-          google.script.run.withSuccessHandler(res => { 
-              state.records = res; 
+          google.script.run.withSuccessHandler(res => {
+              state.records = res;
               autoSwitchToLatestYear();
-              renderDashboard(); 
-              renderYears(); 
+              renderDashboard();
+              renderYears();
+              if (!document.getElementById('view-analysis').classList.contains('hidden')) {
+                renderReport();
+                renderAnalysis();
+              }
           }).getData();
         } else {
           document.getElementById('connection-status').innerText = "デモモード(LocalStorage)";
