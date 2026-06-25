@@ -1031,7 +1031,7 @@
               else if (cleanCat === '源泉徴収税額') tax_withholding += amt;
               else if (cleanCat === '申告納税額') tax_final += amt;
             }
-            else if (x.type === 'income_detail' && cleanCat.endsWith('源泉')) {
+            else if (x.type === 'income_detail' && cleanCat.includes('源泉')) {
               tax_withholding += amt;
             }
             else if (cleanCat.includes('給与収入') || cleanCat.includes('給料支払') || (x.type === 'salary' && !cleanCat.includes('所得'))) {
@@ -1189,7 +1189,7 @@
         } else {
           finalDisplay = '申告納税額 ¥0';
         }
-        document.getElementById('bB-tax-final').innerText = finalDisplay + (taxComputed ? '（参考値）' : '');
+        document.getElementById('bB-tax-final').innerText = finalDisplay;
 
         // 源泉徴収票セクション：income_detailタイプから抽出
         const incomeDetailRows = yr.filter(x => x.type === 'income_detail');
@@ -2032,7 +2032,7 @@
               else if (cleanCat === '差引所得税額') tax_net += amt;
               else if (cleanCat === '復興特別所得税額') tax_reconstruction += amt;
             }
-            else if (x.type === 'income_detail' && cleanCat.endsWith('源泉')) {
+            else if (x.type === 'income_detail' && cleanCat.includes('源泉')) {
               tax_withholding += amt;
             }
             else if (x.type === 'income_detail' && cleanCat === '給与') {
