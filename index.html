@@ -1016,6 +1016,7 @@
         
         let expense_total = 0;
         let tax_gross = 0, tax_net = 0, tax_reconstruction = 0, tax_total = 0, tax_withholding = 0, tax_final = 0;
+        let tax_withholding_direct = 0, tax_withholding_detail = 0;
 
         // スプレッドシートにある「科目名」の部分・完全一致で抽出し、すべて加算する（推測計算を一切しない）
         const debugMiscExpenses = [];
@@ -1028,11 +1029,11 @@
               else if (cleanCat === '差引所得税額') tax_net += amt;
               else if (cleanCat === '復興特別所得税額') tax_reconstruction += amt;
               else if (cleanCat === '所得税及び復興特別所得税の額') tax_total += amt;
-              else if (cleanCat === '源泉徴収税額') tax_withholding += amt;
+              else if (cleanCat === '源泉徴収税額') tax_withholding_direct += amt;
               else if (cleanCat === '申告納税額') tax_final += amt;
             }
             else if (x.type === 'income_detail' && cleanCat.includes('源泉')) {
-              tax_withholding += amt;
+              tax_withholding_detail += amt;
             }
             else if (cleanCat.includes('給与収入') || cleanCat.includes('給料支払') || (x.type === 'salary' && !cleanCat.includes('所得'))) {
               target_salary_shunyu += amt;
@@ -1066,6 +1067,9 @@
               }
             }
         });
+
+        // 確定申告書から直接抽出した源泉徴収税額があればそれを優先し、所得の内訳から個別積算した値との二重加算を防ぐ
+        tax_withholding = tax_withholding_direct > 0 ? tax_withholding_direct : tax_withholding_detail;
 
         console.log('=== 雑費 DEBUG INFO ===');
         console.log('Total 雑費 amount:', kessanExps['雑費']);
@@ -2015,6 +2019,7 @@
       function computeYearStats(yr) {
         let salary_income = 0, business_income = 0, business_revenue = 0, expense_total = 0;
         let tax_total = 0, tax_withholding = 0, tax_final = 0, tax_gross = 0, tax_net = 0, tax_reconstruction = 0;
+        let tax_withholding_direct = 0, tax_withholding_detail = 0;
         const companyIncomeMap = {};
 
         yr.forEach(x => {
@@ -2026,14 +2031,14 @@
             else if (x.type === 'expense') expense_total += amt;
             else if (x.type === 'tax') {
               if (cleanCat === '所得税及び復興特別所得税の額') tax_total += amt;
-              else if (cleanCat === '源泉徴収税額') tax_withholding += amt;
+              else if (cleanCat === '源泉徴収税額') tax_withholding_direct += amt;
               else if (cleanCat === '申告納税額') tax_final += amt;
               else if (cleanCat === '算出税額') tax_gross += amt;
               else if (cleanCat === '差引所得税額') tax_net += amt;
               else if (cleanCat === '復興特別所得税額') tax_reconstruction += amt;
             }
             else if (x.type === 'income_detail' && cleanCat.includes('源泉')) {
-              tax_withholding += amt;
+              tax_withholding_detail += amt;
             }
             else if (x.type === 'income_detail' && cleanCat === '給与') {
               const extractCompanyName = (title) => {
@@ -2045,6 +2050,7 @@
               companyIncomeMap[company] += amt;
             }
         });
+        tax_withholding = tax_withholding_direct > 0 ? tax_withholding_direct : tax_withholding_detail;
         const total_income = salary_income + business_income;
         const total_deductions = yr.filter(x => x.type === 'deduction').reduce((s, x) => s + (Number(x.amount) || 0), 0);
         const taxable_income = Math.max(0, total_income - total_deductions);
