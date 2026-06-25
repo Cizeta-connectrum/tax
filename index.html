@@ -1368,16 +1368,12 @@
         const recordsToDelete = state.records.filter(r => r.year === state.currentYear);
         
         if (typeof google !== 'undefined' && google.script) {
-          // GAS環境での一括削除（1件ずつ削除処理を呼び出すか、GAS側にBulkDeleteを用意するのがベターだが今回はループ処理）
-          Promise.all(recordsToDelete.map(r => new Promise((resolve) => {
-                  google.script.run.withSuccessHandler(resolve).deleteData(r.id);
-          }))).then(() => {
-              google.script.run.withSuccessHandler(res => {
-                  state.records = res;
-                  closeToast();
-                  renderDashboard();
-              }).getData();
-          });
+          // 行番号がズレないよう、サーバー側で降順にまとめて削除する
+          google.script.run.withSuccessHandler(res => {
+              state.records = res;
+              closeToast();
+              renderDashboard();
+          }).deleteDataBulk(recordsToDelete.map(r => r.id));
         } else {
           setTimeout(() => {
               state.records = state.records.filter(r => r.year !== state.currentYear);

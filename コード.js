@@ -473,6 +473,13 @@ function deleteData(rowIndex) {
   return getData();
 }
 
+function deleteDataBulk(rowIndexes) {
+  const sheet = initSheet();
+  const sorted = rowIndexes.slice().sort((a, b) => b - a);
+  sorted.forEach(rowIndex => sheet.deleteRow(rowIndex));
+  return getData();
+}
+
 /**
  * 「必要経費合計」や「合計」という名前のエントリを自動削除（重複計上防止）
  */
